@@ -56,3 +56,36 @@
   - GitHub Actions cloud runners on `ProstoAndriuha/harflow` remain gated by an account billing lock on GitHub; all CI checks were verified locally.
 - **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
 - **Recommended Next Task:** `P2-01` — Smart Traffic Cleaner rules & logical exclude/restore (`crates/harflow-classifier`).
+
+## CP-003 — Phase 2 (Traffic Intelligence)
+
+- **Timestamp:** 2026-11-18T03:30:00+02:00
+- **Task IDs:** `P2-01`, `P2-02`, `P2-03`, `P2-04`, `P2-05`
+- **Baseline Commit SHA:** `52028051359500f104f50ab07a2554cc3b051da3` (`5202805`)
+- **Changed Modules:**
+  - `crates/harflow-classifier`, `crates/harflow-endpoints`, `crates/harflow-schema`, `crates/harflow-model`, `crates/harflow-openapi`, `crates/harflow-project`, `crates/harflow-cli`
+  - `schemas/api-model.schema.json`, `packages/shared-types/src/api-model.ts`
+  - `fixtures/har-valid/ecommerce-mixed-traffic.har.json`, `benchmarks/results/phase2-baseline.json`
+  - `docs/algorithms/README.md`, `docs/benchmarks/README.md`, `CHANGELOG.md`, `.agent/TASKS.md`, `.agent/PROJECT_STATE.md`, `.agent/SESSION_LOG.md`
+- **Verified Functionality:**
+  - 13-category classifier + CORS preflight detection + logical filter/exclude/restore (`filter_sessions`, `preview_cleaning`, `exclude_domain`, `include_domain`, `exclude_request`, `restore_request`).
+  - Two-pass endpoint clustering (`discover_endpoints_with_overrides`) with sibling slugs keyed by preceding segment, conservative static small-digit version preservation (`/v1/`, `/api/2/`), prefixed IDs, singularized params & priority pagination (`Cursor > PageNumber > OffsetLimit`).
+  - Recursive multi-observation schema inference (`infer_schema_from_samples`, `infer_endpoint_schemas`, `diff_schemas`) distinguishing absent vs `null` (`nullable`) vs optional, empty array `unknown`, integer+number widening, conservative enums, unions, and nested objects.
+  - OpenAPI 3.1 `parameters` emission, `harflow clean` & `harflow schemas` CLI subcommands, `AppCommand::{CleanerPreview, CleanerUpdate}`, and deterministic mixed-traffic golden suite (`ecommerce-mixed-traffic.har.json`).
+- **Tests & Checks Executed:**
+  - `cargo fmt --all -- --check` -> exit `0`
+  - `cargo clippy --workspace --all-targets -- -D warnings` -> exit `0`
+  - `cargo test --workspace` -> exit `0` (`44/44` Rust workspace tests passed across crates, `cli_smoke`, `property_invariants`, `redaction_fixture`, `phase2_intelligence_golden`, `repo_secret_scan`)
+  - `cargo run --release -p harflow-project --example phase1_bench -- --out benchmarks/results/phase2-baseline.json`:
+    - `1,000 requests` (5 runs): `p50 = 201.20 ms`, `p95 = 226.51 ms` (budget `< 1,000 ms`)
+    - `10,000 requests` (5 runs): `p50 = 1,981.43 ms`, `p95 = 2,036.57 ms` (budget `< 5,000 ms`)
+  - `pnpm lint` -> exit `0`
+  - `pnpm typecheck` -> exit `0`
+  - `pnpm test` -> exit `0` (`5/5` Vitest tests across 4 files)
+  - `pnpm build` -> exit `0`
+- **Known Limitations:**
+  - 50,000-request stress suite & RSS profiling remain scheduled for Phase 3/8.
+  - GitHub Actions cloud runners on `ProstoAndriuha/harflow` are blocked by a remote GitHub account billing lock; all CI checks were verified locally.
+  - Native Tauri 2 desktop bundling remains deferred to Phase 7 per `ADR-0001`.
+- **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
+- **Recommended Next Task:** `P3-01` — Value/cookie/header/path/query/body/pagination candidate extractor & timeline builder (`crates/harflow-dependencies`).

@@ -41,8 +41,8 @@ Priorities: `P0` (Critical) | `P1` (Core) | `P2` (Important) | `P3` (Enhancement
 | -- | -------- | ----- | ------------ | ------ | ------------------- |
 | `P2-01` | P1 | Smart Traffic Cleaner rules & logical exclude/restore (`harflow-classifier`) | `P1-06` | DONE | Deterministic rules across all 13 categories, domain include/exclude, custom rules, soft-exclusion preserving underlying entries, explainable reason & preview diff |
 | `P2-02` | P1 | Endpoint Discovery multi-segment clustering & pagination detection (`harflow-endpoints`) | `P2-01` | DONE | Groups variable path IDs/UUIDs/slugs while preserving static route/version segments, infers optional query params, status code distributions & pagination parameters with confidence scores |
-| `P2-03` | P1 | Multi-observation Schema Inference Engine (`harflow-schema`) | `P2-02` | IN_PROGRESS | Infers request/response JSON schemas across multiple samples, distinguishes nullable vs optional (e.g. 3/5 present -> optional), handles empty arrays, enums, unions & unknown types |
-| `P2-04` | P1 | ProjectWorkspace & CLI integration for cleaning rules, endpoints & schemas (`harflow-project`, `harflow-cli`) | `P2-03` | TODO | Persists cleaned flags, discovered endpoints & inferred schemas in SQLite/APIModel; adds cleaner preview/exclude/restore & schema inspection CLI commands |
+| `P2-03` | P1 | Multi-observation Schema Inference Engine (`harflow-schema`) | `P2-02` | DONE | Infers request/response JSON schemas across multiple samples, distinguishes nullable vs optional (e.g. 3/5 present -> optional), handles empty arrays, enums, unions & unknown types |
+| `P2-04` | P1 | ProjectWorkspace & CLI integration for cleaning rules, endpoints & schemas (`harflow-project`, `harflow-cli`) | `P2-03` | IN_PROGRESS | Persists cleaned flags, discovered endpoints & inferred schemas in SQLite/APIModel; adds cleaner preview/exclude/restore & schema inspection CLI commands |
 | `P2-05` | P1 | Phase 2 unit, golden APIModel & 10k intelligence benchmark tests | `P2-04` | TODO | Golden REST API fixtures produce deterministic `APIModel` endpoints & schemas; 10k intelligence pipeline remains within budget |
 
 ---

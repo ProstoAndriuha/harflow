@@ -123,6 +123,16 @@ pub struct SchemaField {
     pub required: bool,
     pub nullable: bool,
     pub observed_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub union_types: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enum_values: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nested_fields: Vec<SchemaField>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub type_counts: BTreeMap<String, usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,6 +141,8 @@ pub struct SchemaDefinition {
     pub id: String,
     pub name: String,
     pub root_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_type: Option<String>,
     pub fields: Vec<SchemaField>,
     pub observation_count: usize,
 }

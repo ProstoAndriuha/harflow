@@ -5,5 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
 serde = { workspace = true }
 serde_json = { workspace = true }

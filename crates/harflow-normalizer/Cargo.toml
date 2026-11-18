@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64 = { workspace = true }
+harflow-core = { path = "../harflow-core" }
 harflow-har = { path = "../harflow-har" }
 harflow-security = { path = "../harflow-security" }
 serde = { workspace = true }

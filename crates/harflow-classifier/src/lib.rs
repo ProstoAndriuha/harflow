@@ -178,8 +178,7 @@ mod tests {
             response_body: None,
             response_body_json: None,
             response_mime_type: mime.into(),
-            response_encoding: None,
-            transfer_size: 0,
+            ..NormalizedEntry::default()
         }
     }
 

@@ -1,5 +1,7 @@
 use std::fmt;
 
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine;
 use serde_json::Value;
 
 const SENSITIVE_HEADERS: &[&str] = &[
@@ -11,6 +13,25 @@ const SENSITIVE_HEADERS: &[&str] = &[
     "x-auth-token",
     "x-csrf-token",
     "x-xsrf-token",
+    "x-amz-security-token",
+    "x-goog-api-key",
+    "api-key",
+    "token",
+    "x-session-id",
+    "www-authenticate",
+    "proxy-authenticate",
+];
+
+const NON_SECRET_KEY_ALLOWLIST: &[&str] = &[
+    "token_type",
+    "page_token",
+    "next_page_token",
+    "prev_page_token",
+    "sync_token",
+    "continuation_token",
+    "grant_type",
+    "expires_in",
+    "scope",
 ];
 
 const SENSITIVE_KEYS: &[&str] = &[
@@ -26,6 +47,20 @@ const SENSITIVE_KEYS: &[&str] = &[
     "private_key",
     "session_token",
     "csrf_token",
+    "auth_token",
+    "bearer_token",
+    "session_id",
+];
+
+const SENSITIVE_KEY_SUFFIXES: &[&str] = &[
+    "_token",
+    "_secret",
+    "_password",
+    "_passwd",
+    "_api_key",
+    "_apikey",
+    "_private_key",
+    "_session_id",
 ];
 
 /// Wrapper around a redacted secret that guarantees the raw value cannot leak through `Debug` or `Display`.
@@ -73,41 +108,273 @@ pub fn is_sensitive_header_name(name: &str) -> bool {
     SENSITIVE_HEADERS.contains(&lower.as_str())
 }
 
-/// Returns true if a JSON field or query parameter name likely holds a secret.
+/// Returns true if a JSON field, form key, or query parameter name likely holds a secret.
 #[must_use]
 pub fn is_sensitive_key_name(key: &str) -> bool {
-    let lower = key.trim().to_ascii_lowercase();
-    SENSITIVE_KEYS.contains(&lower.as_str())
+    let normalized = key.trim().to_ascii_lowercase().replace('-', "_");
+    if NON_SECRET_KEY_ALLOWLIST.contains(&normalized.as_str()) {
+        return false;
+    }
+    if SENSITIVE_KEYS.contains(&normalized.as_str()) {
+        return true;
+    }
+    SENSITIVE_KEY_SUFFIXES
+        .iter()
+        .any(|suffix| normalized.ends_with(suffix))
 }
 
-/// Redacts a header value when the header name is sensitive or when the value resembles a Bearer token.
+/// Returns `true` when `s` is already a HARFlow redaction marker.
+#[must_use]
+pub fn is_already_redacted(s: &str) -> bool {
+    let trimmed = s.trim();
+    trimmed.starts_with("[REDACTED:") && trimmed.ends_with(']')
+}
+
+/// Detects secret-shaped string values (`Bearer`, `Basic`, `Digest`, or 3-segment JWT)
+/// and returns a deterministic redacted placeholder when matched.
+#[must_use]
+pub fn sanitize_secret_like_string(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || is_already_redacted(trimmed) {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    if let Some(rest) = lower.strip_prefix("bearer ") {
+        if !rest.trim().starts_with("[redacted:") {
+            return Some(RedactedValue::from_secret("bearer_token", trimmed).marker());
+        }
+        return None;
+    }
+    if let Some(rest) = lower.strip_prefix("basic ") {
+        if !rest.trim().starts_with("[redacted:") {
+            return Some(RedactedValue::from_secret("basic_auth", trimmed).marker());
+        }
+        return None;
+    }
+    if let Some(rest) = lower.strip_prefix("digest ") {
+        if !rest.trim().starts_with("[redacted:") {
+            return Some(RedactedValue::from_secret("digest_auth", trimmed).marker());
+        }
+        return None;
+    }
+
+    if looks_like_jwt(trimmed) {
+        return Some(RedactedValue::from_secret("jwt_token", trimmed).marker());
+    }
+
+    None
+}
+
+fn looks_like_jwt(candidate: &str) -> bool {
+    let mut parts = candidate.split('.');
+    let (Some(h), Some(p), Some(s), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+
+    if h.len() < 8 || p.len() < 8 || s.len() < 8 {
+        return false;
+    }
+    if ![h, p, s].iter().all(|seg| {
+        seg.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    }) {
+        return false;
+    }
+
+    let decoded = URL_SAFE_NO_PAD
+        .decode(h)
+        .or_else(|_| URL_SAFE.decode(h))
+        .ok();
+    match decoded.and_then(|bytes| String::from_utf8(bytes).ok()) {
+        Some(text) => text.trim_start().starts_with('{'),
+        None => false,
+    }
+}
+
+/// Redacts all cookie values inside a `Cookie` header while preserving cookie names and order.
+#[must_use]
+pub fn sanitize_cookie_header(raw: &str) -> (String, Vec<(String, String)>, usize) {
+    let mut formatted_parts = Vec::new();
+    let mut pairs = Vec::new();
+    let mut count = 0usize;
+
+    for segment in raw.split(';') {
+        let trimmed = segment.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some((name, val)) = trimmed.split_once('=') {
+            let clean_name = name.trim().to_string();
+            let clean_val = val.trim();
+            let redacted = if is_already_redacted(clean_val) {
+                clean_val.to_string()
+            } else {
+                count += 1;
+                RedactedValue::from_secret("cookie", clean_val).marker()
+            };
+            formatted_parts.push(format!("{clean_name}={redacted}"));
+            pairs.push((clean_name, redacted));
+        } else {
+            let redacted = if is_already_redacted(trimmed) {
+                trimmed.to_string()
+            } else {
+                count += 1;
+                RedactedValue::from_secret("cookie", trimmed).marker()
+            };
+            formatted_parts.push(redacted);
+        }
+    }
+
+    (formatted_parts.join("; "), pairs, count)
+}
+
+/// Redacts the cookie value inside a `Set-Cookie` header using the `"cookie"` kind so
+/// `Set-Cookie` and subsequent `Cookie` headers share identical fingerprints, while preserving attributes.
+#[must_use]
+pub fn sanitize_set_cookie_header(raw: &str) -> (String, Option<(String, String)>, usize) {
+    let (first, attrs) = match raw.split_once(';') {
+        Some((f, r)) => (f.trim(), Some(r.trim())),
+        None => (raw.trim(), None),
+    };
+
+    if let Some((name, val)) = first.split_once('=') {
+        let clean_name = name.trim().to_string();
+        let clean_val = val.trim();
+        let (redacted, count) = if is_already_redacted(clean_val) {
+            (clean_val.to_string(), 0)
+        } else {
+            (RedactedValue::from_secret("cookie", clean_val).marker(), 1)
+        };
+        let rebuilt = match attrs {
+            Some(rest) if !rest.is_empty() => format!("{clean_name}={redacted}; {rest}"),
+            _ => format!("{clean_name}={redacted}"),
+        };
+        (rebuilt, Some((clean_name, redacted)), count)
+    } else if is_already_redacted(raw) {
+        (raw.to_string(), None, 0)
+    } else {
+        (RedactedValue::from_secret("cookie", raw).marker(), None, 1)
+    }
+}
+
+/// Sanitizes an `application/x-www-form-urlencoded` body while preserving field order and duplicates.
+#[must_use]
+pub fn sanitize_form_urlencoded(raw: &str) -> (String, Vec<(String, String)>, usize) {
+    let mut pairs = Vec::new();
+    let mut serialized = Vec::new();
+    let mut count = 0usize;
+
+    for pair in raw.split('&').filter(|p| !p.is_empty()) {
+        let (raw_key, raw_val) = match pair.split_once('=') {
+            Some((k, v)) => (k, v),
+            None => (pair, ""),
+        };
+        let decoded_key = percent_decode_form(raw_key);
+        let decoded_val = percent_decode_form(raw_val);
+
+        let clean_val = if is_already_redacted(&decoded_val) {
+            decoded_val
+        } else if is_sensitive_key_name(&decoded_key) {
+            count += 1;
+            RedactedValue::from_secret(decoded_key.to_ascii_lowercase(), &decoded_val).marker()
+        } else if let Some(secret_redacted) = sanitize_secret_like_string(&decoded_val) {
+            count += 1;
+            secret_redacted
+        } else {
+            decoded_val
+        };
+
+        serialized.push(if raw_val.is_empty() && !pair.contains('=') {
+            raw_key.to_string()
+        } else {
+            format!("{raw_key}={clean_val}")
+        });
+        pairs.push((decoded_key, clean_val));
+    }
+
+    (serialized.join("&"), pairs, count)
+}
+
+fn percent_decode_form(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b'%' if i + 2 < bytes.len() => {
+                if let (Some(hi), Some(lo)) = (from_hex(bytes[i + 1]), from_hex(bytes[i + 2])) {
+                    out.push((hi << 4) | lo);
+                    i += 3;
+                } else {
+                    out.push(b'%');
+                    i += 1;
+                }
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn from_hex(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Redacts a header value when the header name is sensitive or when the value matches a secret pattern.
 #[must_use]
 pub fn sanitize_header_value(name: &str, value: &str) -> (String, bool) {
+    let lower_name = name.trim().to_ascii_lowercase();
+    if lower_name == "cookie" {
+        let (clean, _, count) = sanitize_cookie_header(value);
+        return (clean, count > 0);
+    }
+    if lower_name == "set-cookie" {
+        let (clean, _, count) = sanitize_set_cookie_header(value);
+        return (clean, count > 0);
+    }
+
     if is_sensitive_header_name(name) {
-        let kind = name.trim().to_ascii_lowercase().replace('-', "_");
+        if is_already_redacted(value) {
+            return (value.to_string(), false);
+        }
+        let kind = lower_name.replace('-', "_");
         return (RedactedValue::from_secret(kind, value).marker(), true);
     }
 
-    if value
-        .trim_start()
-        .to_ascii_lowercase()
-        .starts_with("bearer ")
-    {
-        return (
-            RedactedValue::from_secret("bearer_token", value).marker(),
-            true,
-        );
+    if let Some(redacted) = sanitize_secret_like_string(value) {
+        return (redacted, true);
     }
 
     (value.to_string(), false)
 }
 
-/// Redacts a query parameter value when its key is sensitive.
+/// Redacts a query parameter value when its key is sensitive or its value looks like a secret token.
 #[must_use]
 pub fn sanitize_query_param(name: &str, value: &str) -> (String, bool) {
+    if is_already_redacted(value) {
+        return (value.to_string(), false);
+    }
     if is_sensitive_key_name(name) {
         let kind = name.trim().to_ascii_lowercase();
         return (RedactedValue::from_secret(kind, value).marker(), true);
+    }
+    if let Some(redacted) = sanitize_secret_like_string(value) {
+        return (redacted, true);
     }
     (value.to_string(), false)
 }
@@ -121,12 +388,17 @@ pub fn sanitize_json_value(input: &Value) -> (Value, usize) {
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, v) in map {
                 if is_sensitive_key_name(k) {
-                    let raw = v
-                        .as_str()
-                        .map_or_else(|| v.to_string(), ToString::to_string);
-                    let marker = RedactedValue::from_secret(k.to_ascii_lowercase(), &raw).marker();
-                    out.insert(k.clone(), Value::String(marker));
-                    count += 1;
+                    if v.as_str().is_some_and(is_already_redacted) {
+                        out.insert(k.clone(), v.clone());
+                    } else {
+                        let raw = v
+                            .as_str()
+                            .map_or_else(|| v.to_string(), ToString::to_string);
+                        let marker =
+                            RedactedValue::from_secret(k.to_ascii_lowercase(), &raw).marker();
+                        out.insert(k.clone(), Value::String(marker));
+                        count += 1;
+                    }
                 } else {
                     let (clean_child, child_count) = sanitize_json_value(v);
                     count += child_count;
@@ -146,9 +418,8 @@ pub fn sanitize_json_value(input: &Value) -> (Value, usize) {
             (Value::Array(out), count)
         }
         Value::String(s) => {
-            if s.trim_start().to_ascii_lowercase().starts_with("bearer ") {
-                let marker = RedactedValue::from_secret("bearer_token", s).marker();
-                (Value::String(marker), 1)
+            if let Some(redacted) = sanitize_secret_like_string(s) {
+                (Value::String(redacted), 1)
             } else {
                 (Value::String(s.clone()), 0)
             }
@@ -190,6 +461,12 @@ fn fnv1a_64(bytes: &[u8]) -> u64 {
 mod tests {
     use super::*;
 
+    fn make_synthetic_jwt() -> String {
+        let hdr = URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#);
+        let payload = URL_SAFE_NO_PAD.encode(br#"{"sub":"hf_user_01","scope":"read"}"#);
+        format!("{hdr}.{payload}.syntheticSig12345")
+    }
+
     #[test]
     fn redacted_value_never_exposes_raw_secret_in_debug_or_display() {
         let secret = "hf_synthetic_super_secret_value_12345";
@@ -219,5 +496,56 @@ mod tests {
         assert!(!serialized.contains("hf_synthetic_access_999"));
         assert!(!serialized.contains("hf_synthetic_password"));
         assert!(serialized.contains("alice"));
+    }
+
+    #[test]
+    fn detects_jwt_basic_and_preserves_pagination_tokens() {
+        let jwt = make_synthetic_jwt();
+        let (clean_query, q_changed) = sanitize_query_param("state_blob", &jwt);
+        assert!(q_changed);
+        assert!(!clean_query.contains(&jwt));
+        assert!(clean_query.starts_with("[REDACTED:jwt_token:"));
+
+        let json_with_jwt = serde_json::json!({
+            "data": jwt,
+            "page_token": "cursor_page_2",
+            "next_page_token": "cursor_page_3"
+        });
+        let (clean_json, count) = sanitize_json_value(&json_with_jwt);
+        assert_eq!(count, 1);
+        assert_eq!(clean_json["page_token"], "cursor_page_2");
+        assert_eq!(clean_json["next_page_token"], "cursor_page_3");
+
+        let (reclean, recount) = sanitize_json_value(&clean_json);
+        assert_eq!(reclean, clean_json);
+        assert_eq!(recount, 0);
+
+        let (basic, b_changed) = sanitize_header_value("X-Proxy-Auth", "Basic dXNlcjpwYXNz");
+        assert!(b_changed);
+        assert!(basic.starts_with("[REDACTED:basic_auth:"));
+    }
+
+    #[test]
+    fn correlates_set_cookie_and_cookie_fingerprints_and_redacts_form_bodies() {
+        let (set_cookie_hdr, set_pair, sc_count) =
+            sanitize_set_cookie_header("sid=hf_synthetic_sess_77; HttpOnly; Secure");
+        let (cookie_hdr, cookie_pairs, c_count) =
+            sanitize_cookie_header("sid=hf_synthetic_sess_77; theme=dark");
+
+        assert_eq!(sc_count, 1);
+        assert_eq!(c_count, 2);
+        assert!(set_cookie_hdr.contains("; HttpOnly; Secure"));
+        assert!(!set_cookie_hdr.contains("hf_synthetic_sess_77"));
+        assert!(!cookie_hdr.contains("hf_synthetic_sess_77"));
+        assert_eq!(set_pair.expect("pair").1, cookie_pairs[0].1);
+
+        let form = "grant_type=password&password=hf_synthetic_pw&client_secret=hf_synthetic_cs&tag=a&tag=b";
+        let (clean_form, pairs, form_count) = sanitize_form_urlencoded(form);
+        assert_eq!(form_count, 2);
+        assert!(!clean_form.contains("hf_synthetic_pw"));
+        assert!(!clean_form.contains("hf_synthetic_cs"));
+        assert_eq!(pairs[0], ("grant_type".into(), "password".into()));
+        assert_eq!(pairs[3], ("tag".into(), "a".into()));
+        assert_eq!(pairs[4], ("tag".into(), "b".into()));
     }
 }

@@ -89,3 +89,37 @@
   - Native Tauri 2 desktop bundling remains deferred to Phase 7 per `ADR-0001`.
 - **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
 - **Recommended Next Task:** `P3-01` — Value/cookie/header/path/query/body/pagination candidate extractor & timeline builder (`crates/harflow-dependencies`).
+
+## CP-004 — Phase 3 (Dependency Engine & Session Intelligence)
+
+- **Timestamp:** 2026-11-18T04:28:00+02:00
+- **Task IDs:** `P3-01`, `P3-02`, `P3-03`, `P3-04`, `P3-05`, `P3-06`
+- **Baseline Commit SHA:** `8111785df60a1c3aa9665a77890e1ea34a9aaa78` (`8111785`)
+- **Changed Modules:**
+  - `crates/harflow-security`, `crates/harflow-dependencies`, `crates/harflow-graph`, `crates/harflow-sessions`, `crates/harflow-project`, `crates/harflow-cli`
+  - `schemas/graph.schema.json`, `packages/shared-types/src/graph.ts`
+  - `benchmarks/datasets/dependency-eval-primary.json`, `benchmarks/datasets/dependency-eval-holdout.json`, `benchmarks/results/phase3-dependency-eval.json`, `benchmarks/results/phase3-baseline.json`
+  - `docs/algorithms/README.md`, `docs/benchmarks/README.md`, `CHANGELOG.md`, `.agent/{BUGS,TASKS,PROJECT_STATE,SESSION_LOG}.md`
+- **Verified Functionality:**
+  - Credential-payload redacted fingerprint correlation (`parse_redacted_marker`, `fingerprint_secret`) uniting JSON token producers (`access_token`) with `Authorization: Bearer ...` headers cleanly without secret exposure.
+  - Strictly isolated chronological `SessionTimeline`, 8-location producer/consumer extractors, linear $O(N)$ forward hash index detector supporting `Identity`, `PrefixSuffix`, `UrlEncoding`, `Base64`, and `JsonExtract`, pre-existing client & weak-scalar exclusion filters (`BUG-001` fixed), and calibrated $C = 0.30V + 0.20T + 0.20U + 0.20R + 0.10S$ scoring with cross-session corroboration/contradiction adjustment.
+  - All 5 `GraphViewModel` perspectives (`build_graph`) plus request-level contradiction peeling (`analyze_graph_cycles`) separating benign pagination loops from chronological cycles.
+  - Session intelligence (`Bearer`, `CookieSession`, `Csrf`, `ApiKey`, `OauthLike`, custom signature hooks, token rotation tracking, expiration signals, strict `auto_refresh_eligible`) and Multi-HAR session comparison (`VariabilityKind`, corroborated dependencies, schema drift).
+  - Workspace workflow synthesis, manual override retention across `analyze()`, and CLI subcommands `harflow dependencies`, `harflow sessions`, and `harflow graph --kind`.
+- **Tests & Checks Executed:**
+  - `cargo fmt --all -- --check` -> exit `0`
+  - `cargo clippy --workspace --all-targets -- -D warnings` -> exit `0`
+  - `cargo test --workspace` -> exit `0` (`54/54` Rust tests passed across all 18 crates, `cli_smoke`, `precision_recall_eval`, `property_invariants`, `redaction_fixture`, `phase2_intelligence_golden`, `repo_secret_scan`)
+  - `cargo run --release -p harflow-dependencies --example eval_bench -- --out benchmarks/results/phase3-dependency-eval.json`:
+    - Primary (`29` ground-truth edges): `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`
+    - Holdout (`10` ground-truth edges): `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`
+  - `cargo run --release -p harflow-project --example phase1_bench -- --out benchmarks/results/phase3-baseline.json`:
+    - `1,000 requests` (5 runs): `p50 = 169.67 ms`, `p95 = 198.45 ms` (budget `< 1,000 ms`)
+    - `10,000 requests` (5 runs): `p50 = 1,650.61 ms`, `p95 = 2,309.88 ms` (budget `< 5,000 ms`)
+  - `pnpm lint`, `pnpm typecheck`, `pnpm test` (`5/5` Vitest tests across 4 files), `pnpm build` -> all exit `0`
+- **Known Limitations:**
+  - 50,000-request stress suite & peak RSS profiling remain scheduled for later hardening/Phase 8.
+  - GitHub Actions cloud runners on `ProstoAndriuha/harflow` remain gated by a remote GitHub account billing lock; all CI checks were verified locally.
+  - Native Tauri 2 desktop bundling remains deferred to Phase 7 per `ADR-0001`.
+- **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
+- **Recommended Next Task:** `P4-01` — Application state store, undo/redo history stack & `InMemoryApplicationAdapter` parity with Phase 2/3 cleaner, schemas, graph views & session intelligence (`apps/web`, `packages/shared-types`).

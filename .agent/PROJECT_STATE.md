@@ -9,7 +9,7 @@
 - **Phase 0 (Foundation)**: `DONE` (Checkpoint `CP-001`, commit `49d8512`, pushed to `origin/main`)
 - **Phase 1 (Import & Normalization)**: `DONE` (Checkpoint `CP-002`, commit `f54c9a5`, pushed to `origin/main`)
 - **Phase 2 (Traffic Intelligence)**: `DONE` (Checkpoint `CP-003`, commit `5202805` / `4d902f9`, pushed to `origin/main`)
-- **Phase 3 (Dependency Engine & Session Intelligence)**: `DONE` (Tasks `P3-01`..`P3-06`, pending Checkpoint `CP-004` & push)
+- **Phase 3 (Dependency Engine & Session Intelligence)**: `DONE` (Checkpoint `CP-004`, baseline commit `8111785`, synced to `origin/main`)
 - **Phase 4 (Professional UI)**: `READY` (`P4-01`..`P4-06` planned in `.agent/TASKS.md`)
 - **Phases 5–8**: `TODO` (SDK/OpenAPI Export, Mock Replay, Tauri Desktop, Optional Sanitized AI)
 

@@ -27,3 +27,32 @@
   - Host Windows machine uses `stable-x86_64-pc-windows-gnu` + WinLibs MinGW-w64 UCRT (`dlltool`/`as`) rather than MSVC; native Tauri 2 desktop binary compilation and OS installers are deferred to Phase 7 per `ADR-0001`.
   - Phase 0 uses file-based atomic JSON storage (`project.json`, `api-model.json`, `sessions.json`); SQLite project indexing and streaming large-HAR parsing begin in Phase 1.
 - **Recommended Next Task:** `P1-01` — Streaming HAR 1.2 Parser & Bounded Validator (`crates/harflow-har`).
+
+## CP-002 — Phase 1 (Import & Normalization)
+
+- **Timestamp:** 2026-11-18T03:08:30+02:00
+- **Task IDs:** `P1-01`, `P1-02`, `P1-03`, `P1-04`, `P1-05`, `P1-06`
+- **Baseline Commit SHA:** `b18e6cfeac1271ea12815c089d139920044d8350` (`b18e6cf`)
+- **Changed Modules:**
+  - `Cargo.toml`, `Cargo.lock`: added pure-Rust `flate2`, `base64`, and bundled `rusqlite`.
+  - `crates/harflow-har`: streaming `stream_har_reader`, `BoundedReader` size & nesting limits, `.har.gz` decompression-bomb guard, `_initiator`, partial-entry recovery (`SkippedEntryWarning`).
+  - `crates/harflow-security`: JWT / `Basic` / `Digest` detection, `application/x-www-form-urlencoded` sanitization, fingerprint-correlated `Cookie` / `Set-Cookie` redaction, pagination-token allowlist.
+  - `crates/harflow-normalizer`: streaming `normalize_har_reader`, `FieldPresence` (`Missing`/`Null`/`Value`), form parameters, base64 JSON response decoding/sanitization, separate `Content-Encoding` vs HAR encoding, 250-iteration property & fuzz-seed suite.
+  - `crates/harflow-project`: `sqlite_store.rs` implementing all 11 SRS SQLite tables, `PRAGMA user_version` migrations with pre-migration backups (`harflow.sqlite.bak.v<N>`), `analysis_runs` recording, Phase 0 `sessions.json` backfill, and `phase1_bench` 1k/10k benchmark runner.
+  - `crates/harflow-cli`: streaming multi-HAR & `.har.gz` import, `--config` limits validation, `--strict` enforcement on skipped entries.
+  - Docs & tracking: `benchmarks/results/phase1-baseline.json`, `docs/benchmarks/README.md`, `CHANGELOG.md`, `.agent/{TASKS,PROJECT_STATE,SESSION_LOG}.md`.
+- **Verified Functionality:**
+  - End-to-end streaming import (`plain` + `.har.gz`), decompression-bomb rejection (exit `3`), zero raw secrets persisted in `harflow.sqlite` or JSON manifests, migration backup creation (`harflow.sqlite.bak.v1`), backward compatibility with Phase 0 `sessions.json`, multi-HAR CLI import, `--config` validation (exit `2`), and `--strict` partial-entry failure (exit `3`).
+- **Tests & Checks Executed:**
+  - `cargo fmt --all -- --check` -> exit `0`
+  - `cargo clippy --workspace --all-targets -- -D warnings` -> exit `0` (0 warnings)
+  - `cargo test --workspace` -> exit `0` (`38/38` Rust tests passed across all 18 crates, `cli_smoke`, `property_invariants`, `redaction_fixture`, `repo_secret_scan`)
+  - `cargo run --release -p harflow-project --example phase1_bench -- --write`:
+    - `1,000 requests` (5 runs): `p50 = 158.45 ms`, `p95 = 166.56 ms` (SRS budget `< 1,000 ms`)
+    - `10,000 requests` (5 runs): `p50 = 1,328.04 ms`, `p95 = 1,431.39 ms` (SRS budget `< 5,000 ms`)
+  - `pnpm lint`, `pnpm typecheck`, `pnpm test` (`5/5` Vitest tests), `pnpm build` -> all exit `0`
+- **Known Limitations:**
+  - 50,000-request stress benchmark and peak RSS telemetry profiling remain scheduled for Phase 2/8.
+  - GitHub Actions cloud runners on `ProstoAndriuha/harflow` remain gated by an account billing lock on GitHub; all CI checks were verified locally.
+- **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
+- **Recommended Next Task:** `P2-01` — Smart Traffic Cleaner rules & logical exclude/restore (`crates/harflow-classifier`).

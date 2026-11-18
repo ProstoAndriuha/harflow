@@ -4,12 +4,14 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
+use harflow_classifier::{filter_sessions, preview_cleaning, CleanerConfig, CleanerPreview};
 use harflow_core::{HarflowError, SCHEMA_VERSION};
-use harflow_endpoints::discover_endpoints;
+use harflow_endpoints::discover_endpoints_with_overrides;
 use harflow_graph::{build_endpoint_graph, GraphViewModel};
 use harflow_har::{HarStreamSummary, ImportLimits};
 use harflow_model::{ApiModel, ConfirmationStatus, Dependency, Endpoint, SessionSource};
 use harflow_normalizer::{normalize_har_reader, NormalizedSession};
+use harflow_schema::infer_endpoint_schemas;
 use harflow_sessions::detect_observed_auth;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -22,6 +24,10 @@ pub struct ProjectSettings {
     pub retain_original_har: bool,
     pub max_har_size_bytes: usize,
     pub offline_only: bool,
+    #[serde(default)]
+    pub cleaner: CleanerConfig,
+    #[serde(default)]
+    pub endpoint_overrides: BTreeMap<String, String>,
 }
 
 impl Default for ProjectSettings {
@@ -30,6 +36,8 @@ impl Default for ProjectSettings {
             retain_original_har: false,
             max_har_size_bytes: ImportLimits::default().default_max_bytes,
             offline_only: true,
+            cleaner: CleanerConfig::default(),
+            endpoint_overrides: BTreeMap::new(),
         }
     }
 }
@@ -239,10 +247,19 @@ impl ProjectWorkspace {
         Ok(source)
     }
 
-    /// Runs deterministic endpoint discovery and session auth detection while preserving user overrides.
+    /// Runs deterministic traffic cleaning, endpoint discovery, schema inference, and auth detection
+    /// while preserving user overrides and keeping raw normalized sessions intact for restoration.
     pub fn analyze(&mut self) -> Result<(), HarflowError> {
-        self.model.endpoints = discover_endpoints(&self.sessions);
-        self.model.auth_flows = detect_observed_auth(&self.sessions);
+        let (filtered_sessions, preview) =
+            filter_sessions(&self.sessions, &self.manifest.settings.cleaner);
+
+        self.model.metadata.excluded_requests = preview.excluded_entries;
+        self.model.endpoints = discover_endpoints_with_overrides(
+            &filtered_sessions,
+            &self.manifest.settings.endpoint_overrides,
+        );
+        self.model.schemas = infer_endpoint_schemas(&mut self.model.endpoints, &filtered_sessions);
+        self.model.auth_flows = detect_observed_auth(&filtered_sessions);
 
         for dep in &mut self.model.dependencies {
             if let Some(status) = self.manifest.user_overrides.get(&dep.id) {
@@ -256,6 +273,68 @@ impl ProjectWorkspace {
         self.save()?;
         sqlite_store::record_analysis_run(&self.root_dir.join("harflow.sqlite"), &self.manifest)?;
         Ok(())
+    }
+
+    /// Computes a non-destructive preview of how the configured Smart Traffic Cleaner filters entries.
+    #[must_use]
+    pub fn preview_cleaning(&self) -> CleanerPreview {
+        preview_cleaning(&self.sessions, &self.manifest.settings.cleaner)
+    }
+
+    /// Logically excludes a domain from analysis without deleting underlying captured entries.
+    pub fn exclude_domain(&mut self, domain: &str) -> Result<CleanerPreview, HarflowError> {
+        let norm = domain.trim().to_ascii_lowercase();
+        self.manifest
+            .settings
+            .cleaner
+            .included_domains
+            .remove(&norm);
+        self.manifest.settings.cleaner.excluded_domains.insert(norm);
+        self.manifest.updated_at = Utc::now().to_rfc3339();
+        self.save()?;
+        Ok(self.preview_cleaning())
+    }
+
+    /// Explicitly includes a domain in analysis (except static assets & CORS preflight).
+    pub fn include_domain(&mut self, domain: &str) -> Result<CleanerPreview, HarflowError> {
+        let norm = domain.trim().to_ascii_lowercase();
+        self.manifest
+            .settings
+            .cleaner
+            .excluded_domains
+            .remove(&norm);
+        self.manifest.settings.cleaner.included_domains.insert(norm);
+        self.manifest.updated_at = Utc::now().to_rfc3339();
+        self.save()?;
+        Ok(self.preview_cleaning())
+    }
+
+    /// Logically excludes a single request by ID without removing it from SQLite.
+    pub fn exclude_request(&mut self, request_id: &str) -> Result<CleanerPreview, HarflowError> {
+        let id = request_id.trim().to_string();
+        self.manifest.settings.cleaner.keep_request_ids.remove(&id);
+        self.manifest
+            .settings
+            .cleaner
+            .exclude_request_ids
+            .insert(id);
+        self.manifest.updated_at = Utc::now().to_rfc3339();
+        self.save()?;
+        Ok(self.preview_cleaning())
+    }
+
+    /// Restores a previously excluded or noise-filtered request into active analysis.
+    pub fn restore_request(&mut self, request_id: &str) -> Result<CleanerPreview, HarflowError> {
+        let id = request_id.trim().to_string();
+        self.manifest
+            .settings
+            .cleaner
+            .exclude_request_ids
+            .remove(&id);
+        self.manifest.settings.cleaner.keep_request_ids.insert(id);
+        self.manifest.updated_at = Utc::now().to_rfc3339();
+        self.save()?;
+        Ok(self.preview_cleaning())
     }
 
     /// Confirms or rejects a dependency and persists the user override.
@@ -344,6 +423,20 @@ pub enum AppCommand {
     },
     #[serde(rename = "graph.get")]
     GraphGet { root_dir: PathBuf },
+    #[serde(rename = "cleaner.preview")]
+    CleanerPreview { root_dir: PathBuf },
+    #[serde(rename = "cleaner.update")]
+    CleanerUpdate {
+        root_dir: PathBuf,
+        #[serde(default)]
+        exclude_domain: Option<String>,
+        #[serde(default)]
+        include_domain: Option<String>,
+        #[serde(default)]
+        exclude_request: Option<String>,
+        #[serde(default)]
+        restore_request: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -355,6 +448,7 @@ pub enum AppResponse {
     Endpoints(Vec<Endpoint>),
     Dependencies(Vec<Dependency>),
     Graph(GraphViewModel),
+    Cleaner(CleanerPreview),
 }
 
 /// Dispatches an internal typed application command against the local workspace storage.
@@ -414,6 +508,32 @@ pub fn dispatch_command(cmd: AppCommand) -> Result<AppResponse, HarflowError> {
         AppCommand::GraphGet { root_dir } => {
             let ws = ProjectWorkspace::open(root_dir)?;
             Ok(AppResponse::Graph(build_endpoint_graph(&ws.model)))
+        }
+        AppCommand::CleanerPreview { root_dir } => {
+            let ws = ProjectWorkspace::open(root_dir)?;
+            Ok(AppResponse::Cleaner(ws.preview_cleaning()))
+        }
+        AppCommand::CleanerUpdate {
+            root_dir,
+            exclude_domain,
+            include_domain,
+            exclude_request,
+            restore_request,
+        } => {
+            let mut ws = ProjectWorkspace::open(root_dir)?;
+            if let Some(d) = exclude_domain {
+                ws.exclude_domain(&d)?;
+            }
+            if let Some(d) = include_domain {
+                ws.include_domain(&d)?;
+            }
+            if let Some(r) = exclude_request {
+                ws.exclude_request(&r)?;
+            }
+            if let Some(r) = restore_request {
+                ws.restore_request(&r)?;
+            }
+            Ok(AppResponse::Cleaner(ws.preview_cleaning()))
         }
     }
 }

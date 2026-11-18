@@ -62,6 +62,14 @@ export interface EndpointParameter {
   observedCount: number;
 }
 
+export type PaginationStyle = 'cursor' | 'page_number' | 'offset_limit';
+
+export interface PaginationInfo {
+  style: PaginationStyle;
+  queryParams: string[];
+  responseNextField?: string | null;
+}
+
 export interface Endpoint {
   id: string;
   operationId?: string;
@@ -72,6 +80,8 @@ export interface Endpoint {
   requestSchemaId: string | null;
   responseSchemaId: string | null;
   statusCodes: number[];
+  statusDistribution?: Record<string, number>;
+  pagination?: PaginationInfo | null;
   confidence: number;
   category: string;
   observedRequestIds: string[];
@@ -83,12 +93,18 @@ export interface SchemaField {
   required: boolean;
   nullable: boolean;
   observedCount: number;
+  unionTypes?: string[];
+  enumValues?: string[];
+  itemType?: string | null;
+  nestedFields?: SchemaField[];
+  typeCounts?: Record<string, number>;
 }
 
 export interface SchemaDefinition {
   id: string;
   name: string;
   rootType: string;
+  itemType?: string | null;
   fields: SchemaField[];
   observationCount: number;
 }

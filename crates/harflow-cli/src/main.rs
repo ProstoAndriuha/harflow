@@ -65,10 +65,14 @@ struct Cli {
 enum Commands {
     /// Import a HAR 1.2 file into a local HARFlow project (redacts secrets automatically)
     Import(ImportArgs),
-    /// Run deterministic endpoint and session analysis on a project
+    /// Run deterministic endpoint, cleaner, schema, and session analysis on a project
     Analyze(ProjectArg),
+    /// Preview or update Smart Traffic Cleaner include/exclude rules
+    Clean(CleanArgs),
     /// List discovered API endpoints
     Endpoints(ProjectArg),
+    /// List inferred request and response JSON schemas
+    Schemas(ProjectArg),
     /// Build and print the project dependency/endpoint graph
     Graph(GraphArgs),
     /// Generate a typed async SDK preview (python or typescript)
@@ -106,6 +110,21 @@ struct CliConfig {
 #[derive(Debug, Args)]
 struct ProjectArg {
     project: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct CleanArgs {
+    project: PathBuf,
+    #[arg(long, help = "Preview classification without modifying settings")]
+    preview: bool,
+    #[arg(long = "exclude-domain", value_name = "DOMAIN")]
+    exclude_domains: Vec<String>,
+    #[arg(long = "include-domain", value_name = "DOMAIN")]
+    include_domains: Vec<String>,
+    #[arg(long = "exclude-request", value_name = "REQUEST_ID")]
+    exclude_requests: Vec<String>,
+    #[arg(long = "restore-request", value_name = "REQUEST_ID")]
+    restore_requests: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -229,7 +248,9 @@ fn run(cli: Cli) -> Result<(), HarflowError> {
         }
         Commands::Import(args) => cmd_import(&cli, args),
         Commands::Analyze(args) => cmd_analyze(&cli, args),
+        Commands::Clean(args) => cmd_clean(&cli, args),
         Commands::Endpoints(args) => cmd_endpoints(&cli, args),
+        Commands::Schemas(args) => cmd_schemas(&cli, args),
         Commands::Graph(args) => cmd_graph(&cli, args),
         Commands::Generate(args) => cmd_generate(&cli, args),
         Commands::Export(args) => cmd_export(&cli, args),
@@ -406,6 +427,44 @@ fn cmd_analyze(cli: &Cli, args: &ProjectArg) -> Result<(), HarflowError> {
     Ok(())
 }
 
+fn cmd_clean(cli: &Cli, args: &CleanArgs) -> Result<(), HarflowError> {
+    let mut ws = ProjectWorkspace::open(&args.project)?;
+    let has_mutations = !args.exclude_domains.is_empty()
+        || !args.include_domains.is_empty()
+        || !args.exclude_requests.is_empty()
+        || !args.restore_requests.is_empty();
+
+    if !args.preview && has_mutations {
+        for domain in &args.exclude_domains {
+            ws.exclude_domain(domain)?;
+        }
+        for domain in &args.include_domains {
+            ws.include_domain(domain)?;
+        }
+        for req_id in &args.exclude_requests {
+            ws.exclude_request(req_id)?;
+        }
+        for req_id in &args.restore_requests {
+            ws.restore_request(req_id)?;
+        }
+    }
+
+    let preview = ws.preview_cleaning();
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&preview)
+                .map_err(|e| HarflowError::Storage(e.to_string()))?
+        );
+    } else {
+        println!(
+            "Cleaner summary: {} total, {} kept, {} excluded",
+            preview.total_entries, preview.kept_entries, preview.excluded_entries
+        );
+    }
+    Ok(())
+}
+
 fn cmd_endpoints(cli: &Cli, args: &ProjectArg) -> Result<(), HarflowError> {
     let ws = ProjectWorkspace::open(&args.project)?;
     if cli.json {
@@ -417,6 +476,28 @@ fn cmd_endpoints(cli: &Cli, args: &ProjectArg) -> Result<(), HarflowError> {
     } else {
         for ep in &ws.model.endpoints {
             println!("{} {} ({})", ep.method, ep.path_template, ep.category);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_schemas(cli: &Cli, args: &ProjectArg) -> Result<(), HarflowError> {
+    let ws = ProjectWorkspace::open(&args.project)?;
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&ws.model.schemas)
+                .map_err(|e| HarflowError::Storage(e.to_string()))?
+        );
+    } else {
+        for schema in &ws.model.schemas {
+            println!(
+                "{} ({}, observations={}, fields={})",
+                schema.name,
+                schema.root_type,
+                schema.observation_count,
+                schema.fields.len()
+            );
         }
     }
     Ok(())

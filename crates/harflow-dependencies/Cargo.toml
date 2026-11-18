@@ -5,5 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64 = { workspace = true }
+chrono = { workspace = true }
 harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
+harflow-security = { path = "../harflow-security" }
 serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+harflow-endpoints = { path = "../harflow-endpoints" }
+harflow-har = { path = "../harflow-har" }

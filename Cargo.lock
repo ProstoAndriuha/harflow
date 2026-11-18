@@ -306,8 +306,15 @@ dependencies = [
 name = "harflow-dependencies"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "chrono",
+ "harflow-endpoints",
+ "harflow-har",
  "harflow-model",
+ "harflow-normalizer",
+ "harflow-security",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -70,15 +70,19 @@ pub struct RedactedValue {
     fingerprint: String,
 }
 
+/// Computes a deterministic 8-hex correlation fingerprint for a string without storing the raw input.
+#[must_use]
+pub fn fingerprint_secret(raw: &str) -> String {
+    format!("{:08x}", fnv1a_64(raw.as_bytes()))
+}
+
 impl RedactedValue {
     /// Creates a deterministic redacted placeholder for correlation without retaining the secret.
     #[must_use]
     pub fn from_secret(kind: impl Into<String>, raw_secret: &str) -> Self {
-        let kind_str = kind.into();
-        let hash = fnv1a_64(raw_secret.as_bytes());
         Self {
-            kind: kind_str,
-            fingerprint: format!("{hash:08x}"),
+            kind: kind.into(),
+            fingerprint: fingerprint_secret(raw_secret),
         }
     }
 
@@ -126,8 +130,32 @@ pub fn is_sensitive_key_name(key: &str) -> bool {
 /// Returns `true` when `s` is already a HARFlow redaction marker.
 #[must_use]
 pub fn is_already_redacted(s: &str) -> bool {
-    let trimmed = s.trim();
-    trimmed.starts_with("[REDACTED:") && trimmed.ends_with(']')
+    parse_redacted_marker(s).is_some()
+}
+
+/// Parses a canonical HARFlow redaction marker (`[REDACTED:<kind>:<fingerprint>]`) into `(kind, fingerprint)`.
+#[must_use]
+pub fn parse_redacted_marker(value: &str) -> Option<(&str, &str)> {
+    let inner = value.trim().strip_prefix("[REDACTED:")?.strip_suffix(']')?;
+    let (kind, fingerprint) = inner.rsplit_once(':')?;
+    if kind.is_empty() || fingerprint.is_empty() {
+        return None;
+    }
+    Some((kind, fingerprint))
+}
+
+fn split_auth_scheme(raw: &str) -> Option<(&'static str, &str)> {
+    let trimmed = raw.trim();
+    for (prefix, scheme) in [
+        ("bearer ", "bearer"),
+        ("basic ", "basic"),
+        ("digest ", "digest"),
+    ] {
+        if trimmed.len() >= prefix.len() && trimmed[..prefix.len()].eq_ignore_ascii_case(prefix) {
+            return Some((scheme, trimmed[prefix.len()..].trim()));
+        }
+    }
+    None
 }
 
 /// Detects secret-shaped string values (`Bearer`, `Basic`, `Digest`, or 3-segment JWT)
@@ -139,22 +167,15 @@ pub fn sanitize_secret_like_string(raw: &str) -> Option<String> {
         return None;
     }
 
-    let lower = trimmed.to_ascii_lowercase();
-    if let Some(rest) = lower.strip_prefix("bearer ") {
-        if !rest.trim().starts_with("[redacted:") {
-            return Some(RedactedValue::from_secret("bearer_token", trimmed).marker());
-        }
-        return None;
-    }
-    if let Some(rest) = lower.strip_prefix("basic ") {
-        if !rest.trim().starts_with("[redacted:") {
-            return Some(RedactedValue::from_secret("basic_auth", trimmed).marker());
-        }
-        return None;
-    }
-    if let Some(rest) = lower.strip_prefix("digest ") {
-        if !rest.trim().starts_with("[redacted:") {
-            return Some(RedactedValue::from_secret("digest_auth", trimmed).marker());
+    if let Some((scheme, secret)) = split_auth_scheme(trimmed) {
+        if !secret.is_empty() && !secret.to_ascii_lowercase().starts_with("[redacted:") {
+            let kind = match scheme {
+                "bearer" => "bearer_token",
+                "basic" => "basic_auth",
+                "digest" => "digest_auth",
+                _ => scheme,
+            };
+            return Some(RedactedValue::from_secret(kind, secret).marker());
         }
         return None;
     }
@@ -352,8 +373,22 @@ pub fn sanitize_header_value(name: &str, value: &str) -> (String, bool) {
         if is_already_redacted(value) {
             return (value.to_string(), false);
         }
-        let kind = lower_name.replace('-', "_");
-        return (RedactedValue::from_secret(kind, value).marker(), true);
+        let base_kind = lower_name.replace('-', "_");
+        if matches!(lower_name.as_str(), "authorization" | "proxy-authorization") {
+            if let Some((scheme, secret)) = split_auth_scheme(value) {
+                if secret.to_ascii_lowercase().starts_with("[redacted:") {
+                    return (value.to_string(), false);
+                }
+                if !secret.is_empty() {
+                    return (
+                        RedactedValue::from_secret(format!("{base_kind}_{scheme}"), secret)
+                            .marker(),
+                        true,
+                    );
+                }
+            }
+        }
+        return (RedactedValue::from_secret(base_kind, value).marker(), true);
     }
 
     if let Some(redacted) = sanitize_secret_like_string(value) {
@@ -547,5 +582,26 @@ mod tests {
         assert_eq!(pairs[0], ("grant_type".into(), "password".into()));
         assert_eq!(pairs[3], ("tag".into(), "a".into()));
         assert_eq!(pairs[4], ("tag".into(), "b".into()));
+    }
+
+    #[test]
+    fn correlates_json_access_token_and_bearer_header_fingerprints() {
+        let token = "hf_synthetic_Tok_42";
+        let (clean_json, j_count) =
+            sanitize_json_value(&serde_json::json!({ "access_token": token }));
+        assert_eq!(j_count, 1);
+        let json_marker = clean_json["access_token"].as_str().expect("json marker");
+
+        let (clean_hdr, h_changed) =
+            sanitize_header_value("Authorization", &format!("Bearer {token}"));
+        assert!(h_changed);
+        assert!(!clean_hdr.contains(token));
+
+        let (j_kind, j_fp) = parse_redacted_marker(json_marker).expect("parse json marker");
+        let (h_kind, h_fp) = parse_redacted_marker(&clean_hdr).expect("parse hdr marker");
+        assert_eq!(j_kind, "access_token");
+        assert_eq!(h_kind, "authorization_bearer");
+        assert_eq!(j_fp, h_fp);
+        assert!(parse_redacted_marker("plain-value").is_none());
     }
 }

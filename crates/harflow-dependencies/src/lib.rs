@@ -1,7 +1,16 @@
+pub mod extractor;
+pub mod timeline;
+
+pub use extractor::{
+    extract_candidates, extract_timeline_candidates, CandidateValue, EntryCandidates,
+    ScalarTypeHint,
+};
+pub use timeline::{build_session_timelines, SessionTimeline, TimelineEntry};
+
 use harflow_model::ConfirmationStatus;
 use serde::{Deserialize, Serialize};
 
-/// Five confidence factors specified in SRS Section 4:
+/// Five confidence factors specified in SRS Section 5:
 /// `C = 0.30*V + 0.20*T + 0.20*U + 0.20*R + 0.10*S`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

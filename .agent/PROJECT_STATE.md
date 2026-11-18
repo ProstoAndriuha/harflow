@@ -1,35 +1,33 @@
 # HARFlow Project State
 
-**Last Updated:** 2026-11-18
-**Repository:** `https://github.com/ProstoAndriuha/harflow` (`public`, branch `main`)
-**Current Phase:** Phase 1 — Import & Normalization (`DONE`)
-**Next Phase:** Phase 2 — Traffic Intelligence (`READY`)
-**Toolchain:**
-- Rust: `1.100.0` (Windows host GNU toolchain `x86_64-pc-windows-gnu` + WinLibs MinGW-w64 `2.47.20260726` binutils / GCC `16.2.0`; cross-platform `rust-toolchain.toml` pinned to `1.100.0`)
-- Node.js: `v24.17.0`
-- pnpm: `11.8.0`
-- Python: `3.14.6`
+**Last Updated**: 2026-11-18T03:27:00+02:00
+**Current Milestone**: Phase 2 — Traffic Intelligence (`DONE`) -> Phase 3 — Dependency Engine & Session Intelligence (`READY`)
+**Repository**: `https://github.com/ProstoAndriuha/harflow` (`origin/main`)
 
-## Module Readiness Matrix
+## Phase Summary
 
-| Layer / Module | Location | Current Status | Notes |
-| -------------- | -------- | -------------- | ----- |
-| Governance & SRS | `AGENTS.md`, `docs/specifications/SRS.md` | DONE | Approved spec, ADR-0001, security, benchmarks & contributing docs |
-| Canonical Schemas | `schemas/*.schema.json` | DONE | Draft 2020-12 contracts (`api-model`, `project`, `graph`, `analysis-report`) |
-| Rust Core Workspace | `crates/harflow-*` (18 crates) | DONE | Pure-Rust, zero clippy warnings, `38/38` tests passing |
-| Streaming HAR & Security | `harflow-har`, `harflow-security`, `harflow-normalizer` | DONE | Streaming `.har`/`.har.gz`, bomb protection, JWT/Basic/form/cookie redaction, `FieldPresence`, 250-iter property tests |
-| SQLite Project Index | `crates/harflow-project/src/sqlite_store.rs` | DONE | All 11 SRS tables, `PRAGMA user_version` migrations with pre-migration backups, Phase 0 `sessions.json` backfill |
-| Headless CLI | `crates/harflow-cli` | DONE | Streaming multi-HAR & `.har.gz` import, `--config`, `--strict`, exit codes `0`/`2`/`3`, `p50 = 23.57 ms` |
-| Synthetic Fixtures | `fixtures/*` | DONE | 9 synthetic fixtures (`hf_synthetic_*`), `repo_secret_scan` passes |
-| Shared TS Packages | `packages/{config,shared-types,ui,sdk-templates}` | DONE | Strict TS, accessible `StatusBadge`, Vitest passing |
-| Web Console | `apps/web` | DONE | Dashboard, Traffic Explorer, Dependency Confirm/Reject, EN/RU, Dark/Light |
-| Desktop Scaffold | `apps/desktop` | DONE | Tauri 2 config/capabilities + bridge descriptor tested (native bundling in Phase 7) |
-| CI Workflows | `.github/workflows/*.yml` | DONE | 7 GitHub Actions workflows configured |
+- **Phase 0 (Foundation)**: `DONE` (Checkpoint `CP-001`, commit `49d8512`, pushed to `origin/main`)
+- **Phase 1 (Import & Normalization)**: `DONE` (Checkpoint `CP-002`, commit `f54c9a5`, pushed to `origin/main`)
+- **Phase 2 (Traffic Intelligence)**: `DONE` (Tasks `P2-01`..`P2-05`, pending Checkpoint `CP-003` & push)
+- **Phase 3 (Dependency Engine & Session Intelligence)**: `READY` (`P3-01`..`P3-06` planned in `.agent/TASKS.md`)
+- **Phases 4–8**: `TODO` (UI & Graph, SDK/OpenAPI Export, Mock Replay, Tauri Desktop, Optional Sanitized AI)
 
-## Active Blockers
+## Verified Baseline & Capabilities
 
-- None locally (note: GitHub Actions cloud runners remain gated by account billing lock on GitHub).
+- **Smart Traffic Cleaner (`harflow-classifier`)**: 13 traffic categories, CORS `OPTIONS` preflight detection, `CleanerConfig`, `CustomCleanerRule`, explainable rule reasons, logical `filter_sessions`, domain/request exclude & restore (`preview_cleaning`).
+- **Endpoint Discovery (`harflow-endpoints`)**: Two-pass clustering (`discover_endpoints_with_overrides`), sibling-slug detection keyed with preceding segment, conservative static small-digit version rule (`/v1/`, `/api/2/`), prefixed ID detection (`ord_synthetic_*`), singularized parameter names, typed optional query inference, status code distributions, and priority pagination (`Cursor > PageNumber > OffsetLimit`).
+- **Schema Inference (`harflow-schema`)**: Recursive multi-observation inference (`infer_schema_from_samples`, `infer_endpoint_schemas`, `diff_schemas`) separating absent vs `null` (`nullable`) vs optional, empty arrays (`unknown`), integer+number widening, conservative enums, union types, and nested objects.
+- **Workspace & CLI Integration (`harflow-project`, `harflow-cli`, `harflow-openapi`, `schemas`, `shared-types`)**: Synchronized `api-model.schema.json` & TypeScript types, OpenAPI 3.1 `parameters` emission, `harflow clean` & `harflow schemas` subcommands, `AppCommand::{CleanerPreview, CleanerUpdate}`.
+- **Phase 2 Performance Baseline (`--release`, 5 runs, `benchmarks/results/phase2-baseline.json`)**:
+  - 1,000 requests full pipeline: `p50 = 201.20 ms`, `p95 = 226.51 ms` (budget `< 1,000 ms`)
+  - 10,000 requests full pipeline: `p50 = 1,981.43 ms`, `p95 = 2,036.57 ms` (budget `< 5,000 ms`)
+- **Verification Status**: `44` Rust workspace tests and `5` frontend Vitest tests (`4` test files) across `apps/web`, `apps/desktop`, and `packages/*`; repository secret hygiene scan active (`repo_secret_scan`).
+
+## Open Risks & Limitations
+
+- GitHub Actions cloud runners for `ProstoAndriuha/harflow` currently fail at job start due to remote account billing lock (`The job was not started because your account is locked due to a billing issue.`); all CI gates must be verified locally before pushing.
+- Native Tauri 2 desktop bundling (`apps/desktop`) remains deferred to Phase 7 per `docs/decisions/ADR-0001-foundation-architecture.md`.
 
 ## Next Recommended Task
 
-- **`P2-01`**: Smart Traffic Cleaner rules & logical exclude/restore (`crates/harflow-classifier`) — deterministic rules across all 13 categories, domain include/exclude, custom rules, and soft-exclusion with restore.
+- **`P3-01`**: Value/cookie/header/path/query/body/pagination candidate extractor & chronological timeline builder in `crates/harflow-dependencies`.

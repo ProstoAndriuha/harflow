@@ -1,0 +1,34 @@
+{
+  "phase": "Import, Redaction, Normalization, SQLite Index, Cleaner, Endpoint Discovery & Schema Inference",
+  "profile": "release",
+  "results": [
+    {
+      "p50Ms": 201.2,
+      "p95Ms": 226.51,
+      "payloadBytes": 364927,
+      "requests": 1000,
+      "runs": 5,
+      "timingsMs": [
+        190.11,
+        199.52,
+        201.2,
+        205.24,
+        226.51
+      ]
+    },
+    {
+      "p50Ms": 1981.43,
+      "p95Ms": 2036.57,
+      "payloadBytes": 3659427,
+      "requests": 10000,
+      "runs": 5,
+      "timingsMs": [
+        1475.18,
+        1895.62,
+        1981.43,
+        2003.82,
+        2036.57
+      ]
+    }
+  ]
+}

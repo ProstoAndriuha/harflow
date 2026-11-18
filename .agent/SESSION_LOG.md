@@ -39,3 +39,12 @@
     - `10,000 requests` (5 runs): `p50 = 1,328.04 ms`, `p95 = 1,431.39 ms` (budget `< 5,000 ms`).
   - `pnpm lint`, `pnpm typecheck`, `pnpm test` (`5/5` Vitest tests), `pnpm build`: ALL PASSED (exit `0`).
 - **Next:** Commit `P1-06`, record Checkpoint `CP-002`, push `main` to `origin`, and prepare Phase 2 (`P2-01`).
+
+## Session 003 — Phase 2 Traffic Intelligence (`P2-01`..`P2-05`)
+
+- **Completed Tasks**:
+  - `P2-01` (`9395bea`): 13-category `TrafficCategory` classifier, CORS preflight detection, `CleanerConfig`, `CustomCleanerRule`, `preview_cleaning`, logical `filter_sessions`.
+  - `P2-02` (`3625adf`, `11a89a2`): Two-pass endpoint clustering, sibling slugs keyed with preceding segment, conservative static digit/version preservation, prefixed ID detection, singularized parameter names, query inference, and priority pagination (`Cursor > PageNumber > OffsetLimit`).
+  - `P2-03` (`3eac525`): Recursive multi-observation JSON schema inference (`infer_schema_from_samples`, `infer_endpoint_schemas`, `diff_schemas`) with nullable vs optional, empty array `unknown`, integer+number widening, conservative enums, unions, and nested objects.
+  - `P2-04` (`4791193`): Synchronized JSON Schema & TypeScript types, OpenAPI 3.1 `parameters`, `ProjectWorkspace` cleaning/override lifecycle & CLI subcommands `harflow clean` and `harflow schemas`.
+  - `P2-05`: Synthetic mixed-traffic fixture (`fixtures/har-valid/ecommerce-mixed-traffic.har.json`), golden intelligence suite (`phase2_intelligence_golden.rs`), CLI e2e test (`clean_and_schemas_cli_commands_work_end_to_end`), `--out` support in `phase1_bench.rs`, measured `--release` benchmark (`1k p50 = 201.20 ms`, `10k p50 = 1,981.43 ms`), docs/changelog updates, and Phase 3 backlog (`P3-01`..`P3-06`).

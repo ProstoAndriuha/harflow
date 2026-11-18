@@ -72,12 +72,18 @@ fn bench_count(count: usize, runs: usize) -> serde_json::Value {
 }
 
 fn main() {
-    let write_file = std::env::args().any(|a| a == "--write");
+    let args: Vec<String> = std::env::args().collect();
+    let write_file = args.iter().any(|a| a == "--write");
+    let custom_out = args
+        .windows(2)
+        .find(|w| w[0] == "--out")
+        .map(|w| PathBuf::from(&w[1]));
+
     let r1k = bench_count(1_000, 5);
     let r10k = bench_count(10_000, 5);
 
     let report = json!({
-        "phase": "Phase 1 (Import, Redaction, Normalization, SQLite Index & Endpoint Discovery)",
+        "phase": "Import, Redaction, Normalization, SQLite Index, Cleaner, Endpoint Discovery & Schema Inference",
         "profile": if cfg!(debug_assertions) { "debug" } else { "release" },
         "results": [r1k, r10k],
     });
@@ -85,7 +91,19 @@ fn main() {
     let rendered = serde_json::to_string_pretty(&report).expect("serialize benchmark report");
     println!("{rendered}");
 
-    if write_file {
+    if let Some(rel) = custom_out {
+        let out_path = if rel.is_absolute() {
+            rel
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("crates")
+                .parent()
+                .expect("repo root")
+                .join(rel)
+        };
+        fs::write(&out_path, format!("{rendered}\n")).expect("write benchmark result");
+    } else if write_file {
         let out_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("crates")

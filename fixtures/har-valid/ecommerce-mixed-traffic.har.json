@@ -1,0 +1,111 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": { "name": "HARFlow Phase 2 Synthetic Suite", "version": "1.0.0" },
+    "entries": [
+      {
+        "startedDateTime": "2026-11-18T01:00:00Z",
+        "time": 8.0,
+        "request": { "method": "GET", "url": "https://cdn.example.test/assets/app.js" },
+        "response": { "status": 200, "content": { "mimeType": "application/javascript", "text": "console.log(1);" } }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:01Z",
+        "time": 5.0,
+        "request": { "method": "GET", "url": "https://cdn.example.test/img/logo.png" },
+        "response": { "status": 200, "content": { "mimeType": "image/png" } }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:02Z",
+        "time": 6.0,
+        "request": { "method": "POST", "url": "https://www.google-analytics.com/g/collect" },
+        "response": { "status": 204, "content": { "mimeType": "text/plain" } }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:03Z",
+        "time": 4.0,
+        "request": {
+          "method": "OPTIONS",
+          "url": "https://api.example.test/v1/products",
+          "headers": [{ "name": "Access-Control-Request-Method", "value": "GET" }]
+        },
+        "response": { "status": 204 }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:04Z",
+        "time": 22.0,
+        "request": {
+          "method": "POST",
+          "url": "https://auth.example.test/oauth/token",
+          "headers": [{ "name": "Content-Type", "value": "application/json" }],
+          "postData": { "mimeType": "application/json", "text": "{\"grant_type\":\"client_credentials\"}" }
+        },
+        "response": {
+          "status": 200,
+          "content": { "mimeType": "application/json", "text": "{\"access_token\":\"hf_synthetic_ecom_tok_1\",\"token_type\":\"Bearer\"}" }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:05Z",
+        "time": 18.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/products?limit=20&cursor=cur_1",
+          "headers": [{ "name": "Authorization", "value": "Bearer hf_synthetic_ecom_tok_1" }]
+        },
+        "response": {
+          "status": 200,
+          "content": { "mimeType": "application/json", "text": "{\"items\":[{\"id\":\"prd_1\"}],\"nextCursor\":\"cur_2\"}" }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:06Z",
+        "time": 14.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/users/101",
+          "headers": [{ "name": "Authorization", "value": "Bearer hf_synthetic_ecom_tok_1" }]
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\":101,\"email\":\"u1@example.test\",\"bio\":null,\"tags\":[],\"legacyRef\":10,\"profile\":{\"city\":\"Kyiv\",\"tier\":\"pro\"}}"
+          }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:07Z",
+        "time": 15.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/users/202",
+          "headers": [{ "name": "Authorization", "value": "Bearer hf_synthetic_ecom_tok_1" }]
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\":202,\"email\":\"u2@example.test\",\"bio\":\"hi\",\"nickname\":\"bob\",\"tags\":[],\"legacyRef\":\"old-20\",\"profile\":{\"city\":\"Lviv\"}}"
+          }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T01:00:08Z",
+        "time": 16.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/users/303",
+          "headers": [{ "name": "Authorization", "value": "Bearer hf_synthetic_ecom_tok_1" }]
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\":303,\"email\":\"u3@example.test\",\"bio\":null,\"nickname\":\"cora\",\"tags\":[],\"legacyRef\":30,\"profile\":{\"city\":\"Odesa\"}}"
+          }
+        }
+      }
+    ]
+  }
+}

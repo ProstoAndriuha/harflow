@@ -43,13 +43,25 @@ Priorities: `P0` (Critical) | `P1` (Core) | `P2` (Important) | `P3` (Enhancement
 | `P2-02` | P1 | Endpoint Discovery multi-segment clustering & pagination detection (`harflow-endpoints`) | `P2-01` | DONE | Groups variable path IDs/UUIDs/slugs while preserving static route/version segments, infers optional query params, status code distributions & pagination parameters with confidence scores |
 | `P2-03` | P1 | Multi-observation Schema Inference Engine (`harflow-schema`) | `P2-02` | DONE | Infers request/response JSON schemas across multiple samples, distinguishes nullable vs optional (e.g. 3/5 present -> optional), handles empty arrays, enums, unions & unknown types |
 | `P2-04` | P1 | ProjectWorkspace & CLI integration for cleaning rules, endpoints & schemas (`harflow-project`, `harflow-cli`) | `P2-03` | DONE | Persists cleaned flags, discovered endpoints & inferred schemas in SQLite/APIModel; adds cleaner preview/exclude/restore & schema inspection CLI commands |
-| `P2-05` | P1 | Phase 2 unit, golden APIModel & 10k intelligence benchmark tests | `P2-04` | IN_PROGRESS | Golden REST API fixtures produce deterministic `APIModel` endpoints & schemas; 10k intelligence pipeline remains within budget |
+| `P2-05` | P1 | Phase 2 unit, golden APIModel & 10k intelligence benchmark tests | `P2-04` | DONE | Golden REST API fixtures produce deterministic `APIModel` endpoints & schemas; 10k intelligence pipeline completes in `p50 = 1,981.43 ms` (`< 5s` budget) |
 
 ---
 
-## Future Epics (Phases 3–8)
+## Active Epic: Phase 3 — Dependency Engine & Session Intelligence
 
-- `P3-01`: Phase 3 — Full Dependency Detection Engine, calibration benchmarks, Multi-HAR comparison & Session Intelligence (`harflow-dependencies`, `harflow-sessions`)
+| ID | Priority | Task | Depends On | Status | Acceptance Criteria |
+| -- | -------- | ---- | ---------- | ------ | ------------------- |
+| `P3-01` | P1 | Value/cookie/header/path/query/body/pagination candidate extractor & timeline builder (`harflow-dependencies`) | `P2-05` | TODO | Indexes chronological producer responses & consumer inputs across path, query, headers, cookies, JSON/form bodies & pagination tokens with deterministic provenance locators |
+| `P3-02` | P1 | Transformation evaluation, weak-match exclusion, weighted confidence calibration ($C = 0.30V+0.20T+0.20U+0.20R+0.10S$) & contradiction/cycle guardrails (`harflow-dependencies`, `harflow-graph`) | `P3-01` | TODO | Evaluates direct, trimmed, URL/base64-decoded & JSON-escaped matches; excludes weak structural coincidences; blocks non-chronological links & distinguishes valid pagination loops from contradictions |
+| `P3-03` | P1 | Multi-HAR comparison & Session Intelligence (`harflow-sessions`) | `P3-02` | TODO | Compares volatile vs static parameters across sessions, detects Bearer/Cookie/CSRF/API-key/OAuth2/refresh flows without exposing raw secrets |
+| `P3-04` | P1 | `ProjectWorkspace`, `GraphViewModel` & CLI integration for dependencies/sessions (`harflow-project`, `harflow-graph`, `harflow-cli`, `schemas`, `shared-types`) | `P3-03` | TODO | Persists dependencies, evidence links & session diff findings in SQLite/APIModel; exposes `harflow dependencies` / `harflow sessions` CLI commands & synced TypeScript/JSON schemas |
+| `P3-05` | P1 | Labeled synthetic dataset precision/recall/F1 evaluation harness (`harflow-dependencies`) | `P3-04` | TODO | Measures deterministic Precision >= 98%, Recall >= 85% and documented F1 across curated multi-flow datasets |
+| `P3-06` | P1 | Holdout validation, 10k dependency benchmark & Checkpoint `CP-004` | `P3-05` | TODO | Holdout fixtures generalize without overfitting; 10k end-to-end intelligence+dependency pipeline passes budget; docs & `CP-004` synced to `origin/main` |
+
+---
+
+## Future Epics (Phases 4–8)
+
 - `P4-01`: Phase 4 — Full React Flow Dependency Graph, Virtualized Traffic Explorer, 8-tab Inspector, Command Palette, Undo/Redo (`apps/web`, `packages/ui`)
 - `P5-01`: Phase 5 — Python `httpx` + TypeScript `fetch` SDK generators, OpenAPI 3.1 generator, Export ZIP (`harflow-generator`, `harflow-openapi`)
 - `P6-01`: Phase 6 — Mock Replay server, Validation Center, Golden SDK tests (`harflow-replay`)

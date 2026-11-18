@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Phase 2 (Traffic Intelligence):
+  - 13-category rule-based traffic classifier (`harflow-classifier`) with CORS `OPTIONS` preflight detection, `CleanerConfig` / `CustomCleanerRule` support, explainable rule reasons, logical session filtering (`filter_sessions`), and preview/exclusion/restore overrides.
+  - Two-pass Endpoint Discovery engine (`harflow-endpoints`) with sibling-slug clustering keyed by preceding segment, static small-digit version preservation (`/v1/`, `/api/2/`), prefixed ID detection, singularized parameter naming, typed optional query inference, status distributions, and priority pagination detection (`Cursor > PageNumber > OffsetLimit`).
+  - Recursive multi-observation JSON Schema inference (`harflow-schema`) distinguishing absent vs `null` vs optional fields, empty arrays (`unknown`), integer+number widening, conservative enums, union types, nested objects, and schema drift diffing (`diff_schemas`).
+  - Workspace, OpenAPI 3.1, schema/shared-types, and CLI integration (`harflow clean`, `harflow schemas`, `CleanerPreview`, `CleanerUpdate`), plus synthetic mixed-traffic golden suite (`ecommerce-mixed-traffic.har.json`) and Phase 2 1k/10k release benchmark (`benchmarks/results/phase2-baseline.json`).
 - Phase 1 (Import & Normalization):
   - Streaming HAR 1.2 and `.har.gz` parser (`harflow-har`) with `BoundedReader` size/nesting limits, gzip decompression-bomb protection, `_initiator` extraction, and partial-entry recovery.
   - Expanded credential sanitizer (`harflow-security`) covering `JWT`, `Basic`/`Digest`, `application/x-www-form-urlencoded`, and fingerprint-correlated `Cookie` / `Set-Cookie` redaction with non-secret pagination allowlists.

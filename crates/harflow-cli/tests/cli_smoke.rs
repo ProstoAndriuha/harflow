@@ -214,3 +214,66 @@ fn multi_har_and_gzip_import_strict_and_config_validation() {
 
     let _ = fs::remove_dir_all(&base);
 }
+
+#[test]
+fn clean_and_schemas_cli_commands_work_end_to_end() {
+    let project_dir = std::env::temp_dir().join(format!("harflow_cli_p2_{}", Uuid::new_v4()));
+    let mixed = repo_root().join("fixtures/har-valid/ecommerce-mixed-traffic.har.json");
+
+    let import = Command::new(bin_path())
+        .args([
+            "import",
+            mixed.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("import mixed");
+    assert!(import.status.success());
+
+    let clean_preview = Command::new(bin_path())
+        .args([
+            "clean",
+            project_dir.to_str().unwrap(),
+            "--preview",
+            "--json",
+        ])
+        .output()
+        .expect("clean preview");
+    assert!(clean_preview.status.success());
+    let preview_json: serde_json::Value =
+        serde_json::from_slice(&clean_preview.stdout).expect("parse preview json");
+    assert_eq!(preview_json["excludedEntries"], 4);
+
+    let clean_restore = Command::new(bin_path())
+        .args([
+            "clean",
+            project_dir.to_str().unwrap(),
+            "--restore-request",
+            "sess-0001-req-0001",
+            "--json",
+        ])
+        .output()
+        .expect("clean restore");
+    assert!(clean_restore.status.success());
+    let restored_json: serde_json::Value =
+        serde_json::from_slice(&clean_restore.stdout).expect("parse restored json");
+    assert_eq!(restored_json["excludedEntries"], 3);
+
+    let analyze = Command::new(bin_path())
+        .args(["analyze", project_dir.to_str().unwrap()])
+        .output()
+        .expect("analyze mixed");
+    assert!(analyze.status.success());
+
+    let schemas = Command::new(bin_path())
+        .args(["schemas", project_dir.to_str().unwrap(), "--json"])
+        .output()
+        .expect("schemas json");
+    assert!(schemas.status.success());
+    let schemas_json: serde_json::Value =
+        serde_json::from_slice(&schemas.stdout).expect("parse schemas json");
+    assert!(schemas_json.as_array().unwrap().len() >= 3);
+
+    let _ = fs::remove_dir_all(&project_dir);
+}

@@ -318,6 +318,7 @@ dependencies = [
  "harflow-har",
  "harflow-model",
  "harflow-normalizer",
+ "serde_json",
 ]
 
 [[package]]
@@ -385,12 +386,14 @@ name = "harflow-project"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "harflow-classifier",
  "harflow-core",
  "harflow-endpoints",
  "harflow-graph",
  "harflow-har",
  "harflow-model",
  "harflow-normalizer",
+ "harflow-schema",
  "harflow-sessions",
  "rusqlite",
  "serde",
@@ -420,6 +423,8 @@ dependencies = [
 name = "harflow-schema"
 version = "0.1.0"
 dependencies = [
+ "harflow-model",
+ "harflow-normalizer",
  "serde",
  "serde_json",
 ]

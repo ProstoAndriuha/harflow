@@ -449,9 +449,13 @@ dependencies = [
 name = "harflow-sessions"
 version = "0.1.0"
 dependencies = [
+ "harflow-dependencies",
+ "harflow-endpoints",
  "harflow-har",
  "harflow-model",
  "harflow-normalizer",
+ "harflow-schema",
+ "harflow-security",
  "serde",
  "serde_json",
 ]

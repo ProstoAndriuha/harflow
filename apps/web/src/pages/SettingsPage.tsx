@@ -59,6 +59,17 @@ export function SettingsPage({
         <h2 style={{ marginTop: 0, fontSize: '1rem' }}>{t.settings.privacyTitle}</h2>
         <p style={{ margin: 0, color: 'var(--hf-text-muted)' }}>{t.settings.privacyBody}</p>
       </section>
+
+      <section className="hf-panel">
+        <h2 style={{ marginTop: 0, fontSize: '1rem' }}>{t.settings.shortcutsTitle}</h2>
+        <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+          {t.settings.shortcutsList.map((item) => (
+            <li key={item} className="hf-mono" style={{ fontSize: '0.84rem' }}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

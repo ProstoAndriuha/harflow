@@ -10,6 +10,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   locale: Locale;
   onToggleLocale: () => void;
+  onOpenPalette?: () => void;
 }
 
 export function TopBar({
@@ -20,6 +21,7 @@ export function TopBar({
   onToggleTheme,
   locale,
   onToggleLocale,
+  onOpenPalette,
 }: TopBarProps) {
   const { t } = useI18n();
 
@@ -55,6 +57,11 @@ export function TopBar({
       </nav>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        {onOpenPalette ? (
+          <Button onClick={onOpenPalette} aria-label={t.commandPaletteButton}>
+            {t.commandPaletteButton}
+          </Button>
+        ) : null}
         <Button onClick={onToggleLocale} aria-label="Switch language">
           {locale.toUpperCase()}
         </Button>

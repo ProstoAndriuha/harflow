@@ -1,38 +1,24 @@
-import type { ChangeEvent } from 'react';
 import { Button, Card } from '@harflow/ui';
 import type { AnalysisReport, ProjectManifest } from '@harflow/shared-types';
+import { HarDropzone } from '../components/HarDropzone.js';
 import { useI18n } from '../i18n/index.js';
 
 interface DashboardPageProps {
   manifest: ProjectManifest | null;
   report: AnalysisReport | null;
   onCreateDemo: () => Promise<void>;
-  onImportHarText: (sourceName: string, rawText: string) => Promise<void>;
+  onImportHarFiles: (files: Array<{ sourceName: string; rawText: string }>) => Promise<void>;
 }
 
 export function DashboardPage({
   manifest,
   report,
   onCreateDemo,
-  onImportHarText,
+  onImportHarFiles,
 }: DashboardPageProps) {
   const { t } = useI18n();
   const stats = manifest?.statistics;
   const readinessKey = report?.exportReadiness ?? 'not_ready';
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        void onImportHarText(file.name, reader.result);
-      }
-    };
-    reader.readAsText(file);
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -50,17 +36,13 @@ export function DashboardPage({
           <Button variant="primary" onClick={() => void onCreateDemo()}>
             {t.dashboard.createDemo}
           </Button>
-          <label className="hf-pill" style={{ cursor: 'pointer' }}>
-            <span>{t.dashboard.importHarLabel}</span>
-            <input
-              type="file"
-              accept=".har,.json"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-          </label>
         </div>
       </div>
+
+      <HarDropzone
+        maxBytes={manifest?.settings.maxHarSizeBytes}
+        onImportFiles={onImportHarFiles}
+      />
 
       <div className="hf-grid-cards">
         <Card title={t.dashboard.cards.totalRequests} value={stats?.totalRequests ?? 0} />
@@ -74,6 +56,22 @@ export function DashboardPage({
           value={t.dashboard.readiness[readinessKey]}
         />
       </div>
+
+      {manifest && manifest.sources.length > 0 ? (
+        <section className="hf-panel">
+          <h2 style={{ marginTop: 0, fontSize: '1rem' }}>
+            {t.dashboard.importedSourcesTitle} ({manifest.sources.length})
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {manifest.sources.map((src) => (
+              <span key={src.id} className="hf-pill">
+                <code className="hf-mono">{src.id}</code> · {src.name} ({src.entryCount} req,{' '}
+                {src.redactedSecretsCount} redacted)
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

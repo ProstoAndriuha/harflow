@@ -8,6 +8,7 @@ license.workspace = true
 chrono = { workspace = true }
 harflow-classifier = { path = "../harflow-classifier" }
 harflow-core = { path = "../harflow-core" }
+harflow-dependencies = { path = "../harflow-dependencies" }
 harflow-endpoints = { path = "../harflow-endpoints" }
 harflow-graph = { path = "../harflow-graph" }
 harflow-har = { path = "../harflow-har" }

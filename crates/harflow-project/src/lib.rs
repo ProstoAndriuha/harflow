@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -6,13 +6,17 @@ use std::path::{Path, PathBuf};
 use chrono::Utc;
 use harflow_classifier::{filter_sessions, preview_cleaning, CleanerConfig, CleanerPreview};
 use harflow_core::{HarflowError, SCHEMA_VERSION};
+use harflow_dependencies::detect_dependencies;
 use harflow_endpoints::discover_endpoints_with_overrides;
-use harflow_graph::{build_endpoint_graph, GraphViewModel};
+use harflow_graph::{analyze_graph_cycles, build_graph, GraphKind, GraphViewModel};
 use harflow_har::{HarStreamSummary, ImportLimits};
-use harflow_model::{ApiModel, ConfirmationStatus, Dependency, Endpoint, SessionSource};
+use harflow_model::{ApiModel, ConfirmationStatus, Dependency, Endpoint, SessionSource, Workflow};
 use harflow_normalizer::{normalize_har_reader, NormalizedSession};
 use harflow_schema::infer_endpoint_schemas;
-use harflow_sessions::detect_observed_auth;
+use harflow_sessions::{
+    analyze_session_lifecycle, compare_sessions, detect_observed_auth, SessionComparisonReport,
+    SessionLifecycleReport,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -247,9 +251,17 @@ impl ProjectWorkspace {
         Ok(source)
     }
 
-    /// Runs deterministic traffic cleaning, endpoint discovery, schema inference, and auth detection
-    /// while preserving user overrides and keeping raw normalized sessions intact for restoration.
+    /// Runs deterministic traffic cleaning, endpoint discovery, schema inference, dependency detection,
+    /// workflow synthesis, and auth/cycle detection while preserving user overrides.
     pub fn analyze(&mut self) -> Result<(), HarflowError> {
+        let preserved_overridden: BTreeMap<String, Dependency> = self
+            .model
+            .dependencies
+            .iter()
+            .filter(|d| self.manifest.user_overrides.contains_key(&d.id))
+            .map(|d| (d.id.clone(), d.clone()))
+            .collect();
+
         let (filtered_sessions, preview) =
             filter_sessions(&self.sessions, &self.manifest.settings.cleaner);
 
@@ -261,11 +273,31 @@ impl ProjectWorkspace {
         self.model.schemas = infer_endpoint_schemas(&mut self.model.endpoints, &filtered_sessions);
         self.model.auth_flows = detect_observed_auth(&filtered_sessions);
 
-        for dep in &mut self.model.dependencies {
+        let mut detected = detect_dependencies(&filtered_sessions, &self.model.endpoints);
+        let mut seen_ids: BTreeSet<String> = detected.iter().map(|d| d.id.clone()).collect();
+        for dep in &mut detected {
             if let Some(status) = self.manifest.user_overrides.get(&dep.id) {
                 dep.status = *status;
             }
         }
+        for (id, mut dep) in preserved_overridden {
+            if !seen_ids.contains(&id) {
+                if let Some(status) = self.manifest.user_overrides.get(&id) {
+                    dep.status = *status;
+                }
+                seen_ids.insert(id);
+                detected.push(dep);
+            }
+        }
+        self.model.dependencies = detected;
+        self.model.workflows =
+            synthesize_workflows(&self.model.endpoints, &self.model.dependencies);
+
+        let cycle_analysis = analyze_graph_cycles(&self.model);
+        self.model
+            .diagnostics
+            .retain(|d| d.code != "DEPENDENCY_CYCLE_CONTRADICTION");
+        self.model.diagnostics.extend(cycle_analysis.diagnostics);
 
         self.model.metadata.generated_at = Utc::now().to_rfc3339();
         self.refresh_statistics();
@@ -279,6 +311,30 @@ impl ProjectWorkspace {
     #[must_use]
     pub fn preview_cleaning(&self) -> CleanerPreview {
         preview_cleaning(&self.sessions, &self.manifest.settings.cleaner)
+    }
+
+    /// Computes the Session Lifecycle & Auth Intelligence report on kept entries.
+    #[must_use]
+    pub fn session_lifecycle(&self) -> SessionLifecycleReport {
+        let (filtered_sessions, _) =
+            filter_sessions(&self.sessions, &self.manifest.settings.cleaner);
+        analyze_session_lifecycle(&filtered_sessions, &self.model.dependencies)
+    }
+
+    /// Computes the Multi-HAR comparison report across normalized project sessions.
+    #[must_use]
+    pub fn compare_sessions(&self) -> SessionComparisonReport {
+        let (filtered_sessions, _) =
+            filter_sessions(&self.sessions, &self.manifest.settings.cleaner);
+        compare_sessions(&filtered_sessions, &self.model.dependencies)
+    }
+
+    /// Builds a requested `GraphViewModel` view from the current project model & sessions.
+    #[must_use]
+    pub fn build_graph(&self, kind: GraphKind) -> GraphViewModel {
+        let (filtered_sessions, _) =
+            filter_sessions(&self.sessions, &self.manifest.settings.cleaner);
+        build_graph(&self.model, &filtered_sessions, kind)
     }
 
     /// Logically excludes a domain from analysis without deleting underlying captured entries.
@@ -422,7 +478,15 @@ pub enum AppCommand {
         dependency_id: String,
     },
     #[serde(rename = "graph.get")]
-    GraphGet { root_dir: PathBuf },
+    GraphGet {
+        root_dir: PathBuf,
+        #[serde(default)]
+        kind: Option<GraphKind>,
+    },
+    #[serde(rename = "sessions.lifecycle")]
+    SessionsLifecycle { root_dir: PathBuf },
+    #[serde(rename = "sessions.compare")]
+    SessionsCompare { root_dir: PathBuf },
     #[serde(rename = "cleaner.preview")]
     CleanerPreview { root_dir: PathBuf },
     #[serde(rename = "cleaner.update")]
@@ -449,6 +513,8 @@ pub enum AppResponse {
     Dependencies(Vec<Dependency>),
     Graph(GraphViewModel),
     Cleaner(CleanerPreview),
+    SessionLifecycle(SessionLifecycleReport),
+    SessionComparison(SessionComparisonReport),
 }
 
 /// Dispatches an internal typed application command against the local workspace storage.
@@ -505,9 +571,19 @@ pub fn dispatch_command(cmd: AppCommand) -> Result<AppResponse, HarflowError> {
             ws.set_dependency_status(&dependency_id, ConfirmationStatus::Rejected)?;
             Ok(AppResponse::Dependencies(ws.model.dependencies))
         }
-        AppCommand::GraphGet { root_dir } => {
+        AppCommand::GraphGet { root_dir, kind } => {
             let ws = ProjectWorkspace::open(root_dir)?;
-            Ok(AppResponse::Graph(build_endpoint_graph(&ws.model)))
+            Ok(AppResponse::Graph(
+                ws.build_graph(kind.unwrap_or(GraphKind::Endpoint)),
+            ))
+        }
+        AppCommand::SessionsLifecycle { root_dir } => {
+            let ws = ProjectWorkspace::open(root_dir)?;
+            Ok(AppResponse::SessionLifecycle(ws.session_lifecycle()))
+        }
+        AppCommand::SessionsCompare { root_dir } => {
+            let ws = ProjectWorkspace::open(root_dir)?;
+            Ok(AppResponse::SessionComparison(ws.compare_sessions()))
         }
         AppCommand::CleanerPreview { root_dir } => {
             let ws = ProjectWorkspace::open(root_dir)?;
@@ -536,6 +612,125 @@ pub fn dispatch_command(cmd: AppCommand) -> Result<AppResponse, HarflowError> {
             Ok(AppResponse::Cleaner(ws.preview_cleaning()))
         }
     }
+}
+
+fn synthesize_workflows(endpoints: &[Endpoint], dependencies: &[Dependency]) -> Vec<Workflow> {
+    if endpoints.is_empty() || dependencies.is_empty() {
+        return Vec::new();
+    }
+
+    let mut req_to_ep: BTreeMap<&str, usize> = BTreeMap::new();
+    for (idx, ep) in endpoints.iter().enumerate() {
+        for req_id in &ep.observed_request_ids {
+            req_to_ep.insert(req_id.as_str(), idx);
+        }
+    }
+
+    let n = endpoints.len();
+    let mut adj: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
+    let mut undirected: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
+
+    for dep in dependencies {
+        if !matches!(
+            dep.status,
+            ConfirmationStatus::Confirmed
+                | ConfirmationStatus::UserConfirmed
+                | ConfirmationStatus::Likely
+        ) {
+            continue;
+        }
+        let (Some(&u), Some(&v)) = (
+            req_to_ep.get(dep.source.request_id.as_str()),
+            req_to_ep.get(dep.target.request_id.as_str()),
+        ) else {
+            continue;
+        };
+        if u == v {
+            continue;
+        }
+        adj[u].insert(v);
+        undirected[u].insert(v);
+        undirected[v].insert(u);
+    }
+
+    let mut visited = vec![false; n];
+    let mut workflows = Vec::new();
+    for start in 0..n {
+        if visited[start] || undirected[start].is_empty() {
+            continue;
+        }
+        let mut comp = BTreeSet::new();
+        let mut q = VecDeque::from([start]);
+        visited[start] = true;
+        while let Some(u) = q.pop_front() {
+            comp.insert(u);
+            for &v in &undirected[u] {
+                if !visited[v] {
+                    visited[v] = true;
+                    q.push_back(v);
+                }
+            }
+        }
+        if comp.len() < 2 {
+            continue;
+        }
+
+        // Deterministically sort nodes in component using Kahn topological order bounded by discovery order.
+        let mut local_in: BTreeMap<usize, usize> = comp
+            .iter()
+            .map(|&idx| {
+                let deg = adj
+                    .iter()
+                    .enumerate()
+                    .filter(|(src, edges)| comp.contains(src) && edges.contains(&idx))
+                    .count();
+                (idx, deg)
+            })
+            .collect();
+        let mut topo_q: BTreeSet<usize> = local_in
+            .iter()
+            .filter_map(|(&idx, &deg)| (deg == 0).then_some(idx))
+            .collect();
+
+        let mut ordered = Vec::with_capacity(comp.len());
+        let mut remaining = comp;
+        while !remaining.is_empty() {
+            let next = if let Some(&zero) = topo_q.iter().next() {
+                topo_q.remove(&zero);
+                zero
+            } else {
+                *remaining.iter().next().expect("non-empty component")
+            };
+            remaining.remove(&next);
+            ordered.push(endpoints[next].id.clone());
+            for &nxt in &adj[next] {
+                if remaining.contains(&nxt) {
+                    if let Some(d) = local_in.get_mut(&nxt) {
+                        *d = d.saturating_sub(1);
+                        if *d == 0 {
+                            topo_q.insert(nxt);
+                        }
+                    }
+                }
+            }
+        }
+
+        let first = &endpoints[ordered
+            .first()
+            .and_then(|id| endpoints.iter().position(|e| &e.id == id))
+            .unwrap_or(start)];
+        let wf_idx = workflows.len() + 1;
+        workflows.push(Workflow {
+            id: format!("wf-{wf_idx:02}"),
+            name: format!(
+                "{} ({} {}) Flow",
+                first.host, first.method, first.path_template
+            ),
+            step_endpoint_ids: ordered,
+        });
+    }
+
+    workflows
 }
 
 fn write_json_atomic<T: Serialize>(target: &Path, value: &T) -> Result<(), HarflowError> {

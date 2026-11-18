@@ -277,3 +277,127 @@ fn clean_and_schemas_cli_commands_work_end_to_end() {
 
     let _ = fs::remove_dir_all(&project_dir);
 }
+
+#[test]
+fn dependencies_sessions_and_graph_kind_cli_commands_work_end_to_end() {
+    let project_dir = std::env::temp_dir().join(format!("harflow_cli_p3_{}", Uuid::new_v4()));
+    let mixed = repo_root().join("fixtures/har-valid/ecommerce-mixed-traffic.har.json");
+    let session_b = repo_root().join("fixtures/multi-session/session-b.har.json");
+
+    let import = Command::new(bin_path())
+        .args([
+            "import",
+            mixed.to_str().unwrap(),
+            session_b.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("import multi");
+    assert!(import.status.success());
+
+    let analyze = Command::new(bin_path())
+        .args(["analyze", project_dir.to_str().unwrap()])
+        .output()
+        .expect("analyze");
+    assert!(analyze.status.success());
+
+    let deps_out = Command::new(bin_path())
+        .args(["dependencies", project_dir.to_str().unwrap(), "--json"])
+        .output()
+        .expect("dependencies json");
+    assert!(deps_out.status.success());
+    let deps_json: serde_json::Value =
+        serde_json::from_slice(&deps_out.stdout).expect("parse dependencies");
+    let deps_arr = deps_json.as_array().expect("deps array");
+    assert!(!deps_arr.is_empty());
+    let first_dep_id = deps_arr[0]["id"].as_str().expect("dep id").to_string();
+
+    let confirm_out = Command::new(bin_path())
+        .args([
+            "dependencies",
+            project_dir.to_str().unwrap(),
+            "--confirm",
+            &first_dep_id,
+            "--status",
+            "user-confirmed",
+            "--json",
+        ])
+        .output()
+        .expect("confirm dep");
+    assert!(confirm_out.status.success());
+    let confirmed_json: serde_json::Value =
+        serde_json::from_slice(&confirm_out.stdout).expect("parse confirmed");
+    assert!(confirmed_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == first_dep_id && d["status"] == "user_confirmed"));
+
+    // Override must persist across subsequent re-analysis.
+    let reanalyze = Command::new(bin_path())
+        .args(["analyze", project_dir.to_str().unwrap()])
+        .output()
+        .expect("reanalyze");
+    assert!(reanalyze.status.success());
+
+    let after_reanalyze = Command::new(bin_path())
+        .args([
+            "dependencies",
+            project_dir.to_str().unwrap(),
+            "--status",
+            "user-confirmed",
+            "--json",
+        ])
+        .output()
+        .expect("deps after reanalyze");
+    assert!(after_reanalyze.status.success());
+    let persisted: serde_json::Value =
+        serde_json::from_slice(&after_reanalyze.stdout).expect("parse persisted");
+    assert!(persisted
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == first_dep_id));
+
+    let sessions_lc = Command::new(bin_path())
+        .args(["sessions", project_dir.to_str().unwrap(), "--json"])
+        .output()
+        .expect("sessions lifecycle");
+    assert!(sessions_lc.status.success());
+    let lc_json: serde_json::Value =
+        serde_json::from_slice(&sessions_lc.stdout).expect("parse lifecycle");
+    assert!(!lc_json["authFlows"].as_array().unwrap().is_empty());
+
+    let sessions_cmp = Command::new(bin_path())
+        .args([
+            "sessions",
+            project_dir.to_str().unwrap(),
+            "--compare",
+            "--json",
+        ])
+        .output()
+        .expect("sessions compare");
+    assert!(sessions_cmp.status.success());
+    let cmp_json: serde_json::Value =
+        serde_json::from_slice(&sessions_cmp.stdout).expect("parse compare");
+    assert_eq!(cmp_json["sessionIds"].as_array().unwrap().len(), 2);
+
+    let req_graph = Command::new(bin_path())
+        .args([
+            "graph",
+            project_dir.to_str().unwrap(),
+            "--kind",
+            "request-dependency",
+            "--json",
+        ])
+        .output()
+        .expect("graph request-dependency");
+    assert!(req_graph.status.success());
+    let graph_json: serde_json::Value =
+        serde_json::from_slice(&req_graph.stdout).expect("parse graph");
+    assert_eq!(graph_json["kind"], "request_dependency");
+    assert!(!graph_json["edges"].as_array().unwrap().is_empty());
+
+    let _ = fs::remove_dir_all(&project_dir);
+}

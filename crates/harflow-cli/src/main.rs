@@ -6,8 +6,9 @@ use std::process;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use harflow_core::{ExitCode, HarflowError, SCHEMA_VERSION};
 use harflow_generator::{generate_sdk_preview, SdkTarget};
-use harflow_graph::build_endpoint_graph;
+use harflow_graph::GraphKind;
 use harflow_har::ImportLimits;
+use harflow_model::ConfirmationStatus;
 use harflow_openapi::build_openapi_document;
 use harflow_project::ProjectWorkspace;
 use harflow_replay::{validate_replay_policy, ReplayConfig, ReplayMode, ValidationReport};
@@ -73,6 +74,10 @@ enum Commands {
     Endpoints(ProjectArg),
     /// List inferred request and response JSON schemas
     Schemas(ProjectArg),
+    /// Inspect, confirm, or reject detected API dependencies
+    Dependencies(DependenciesArgs),
+    /// Inspect authentication mechanisms, token rotations, or Multi-HAR session diffs
+    Sessions(SessionsArgs),
     /// Build and print the project dependency/endpoint graph
     Graph(GraphArgs),
     /// Generate a typed async SDK preview (python or typescript)
@@ -128,8 +133,73 @@ struct CleanArgs {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliConfirmationStatus {
+    Confirmed,
+    Likely,
+    Unknown,
+    Rejected,
+    #[value(name = "user-confirmed", alias = "user_confirmed")]
+    UserConfirmed,
+}
+
+impl From<CliConfirmationStatus> for ConfirmationStatus {
+    fn from(value: CliConfirmationStatus) -> Self {
+        match value {
+            CliConfirmationStatus::Confirmed => Self::Confirmed,
+            CliConfirmationStatus::Likely => Self::Likely,
+            CliConfirmationStatus::Unknown => Self::Unknown,
+            CliConfirmationStatus::Rejected => Self::Rejected,
+            CliConfirmationStatus::UserConfirmed => Self::UserConfirmed,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct DependenciesArgs {
+    project: PathBuf,
+    #[arg(long, value_enum, help = "Filter dependencies by status")]
+    status: Option<CliConfirmationStatus>,
+    #[arg(long = "confirm", value_name = "DEPENDENCY_ID")]
+    confirm_ids: Vec<String>,
+    #[arg(long = "reject", value_name = "DEPENDENCY_ID")]
+    reject_ids: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+struct SessionsArgs {
+    project: PathBuf,
+    #[arg(long, help = "Compare multiple imported HAR sessions")]
+    compare: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum GraphFormat {
     Json,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliGraphKind {
+    Endpoint,
+    #[value(name = "request-dependency", alias = "request_dependency")]
+    RequestDependency,
+    #[value(name = "auth-flow", alias = "auth_flow")]
+    AuthFlow,
+    #[value(name = "session-timeline", alias = "session_timeline")]
+    SessionTimeline,
+    #[value(name = "data-flow", alias = "data_flow")]
+    DataFlow,
+}
+
+impl From<CliGraphKind> for GraphKind {
+    fn from(value: CliGraphKind) -> Self {
+        match value {
+            CliGraphKind::Endpoint => Self::Endpoint,
+            CliGraphKind::RequestDependency => Self::RequestDependency,
+            CliGraphKind::AuthFlow => Self::AuthFlow,
+            CliGraphKind::SessionTimeline => Self::SessionTimeline,
+            CliGraphKind::DataFlow => Self::DataFlow,
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +207,8 @@ struct GraphArgs {
     project: PathBuf,
     #[arg(long, value_enum, default_value_t = GraphFormat::Json)]
     format: GraphFormat,
+    #[arg(long, value_enum, default_value_t = CliGraphKind::Endpoint)]
+    kind: CliGraphKind,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -251,6 +323,8 @@ fn run(cli: Cli) -> Result<(), HarflowError> {
         Commands::Clean(args) => cmd_clean(&cli, args),
         Commands::Endpoints(args) => cmd_endpoints(&cli, args),
         Commands::Schemas(args) => cmd_schemas(&cli, args),
+        Commands::Dependencies(args) => cmd_dependencies(&cli, args),
+        Commands::Sessions(args) => cmd_sessions(&cli, args),
         Commands::Graph(args) => cmd_graph(&cli, args),
         Commands::Generate(args) => cmd_generate(&cli, args),
         Commands::Export(args) => cmd_export(&cli, args),
@@ -503,9 +577,94 @@ fn cmd_schemas(cli: &Cli, args: &ProjectArg) -> Result<(), HarflowError> {
     Ok(())
 }
 
+fn cmd_dependencies(cli: &Cli, args: &DependenciesArgs) -> Result<(), HarflowError> {
+    let mut ws = ProjectWorkspace::open(&args.project)?;
+    for id in &args.confirm_ids {
+        ws.set_dependency_status(id, ConfirmationStatus::UserConfirmed)?;
+    }
+    for id in &args.reject_ids {
+        ws.set_dependency_status(id, ConfirmationStatus::Rejected)?;
+    }
+
+    let filter = args.status.map(ConfirmationStatus::from);
+    let filtered: Vec<_> = ws
+        .model
+        .dependencies
+        .iter()
+        .filter(|dep| filter.is_none_or(|expected| dep.status == expected))
+        .cloned()
+        .collect();
+
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&filtered)
+                .map_err(|e| HarflowError::Storage(e.to_string()))?
+        );
+    } else if filtered.is_empty() {
+        println!("No matching dependencies");
+    } else {
+        for dep in &filtered {
+            println!(
+                "{} [{:?}] {:.2} {}:{} -> {}:{} ({:?})",
+                dep.id,
+                dep.status,
+                dep.confidence,
+                dep.source.request_id,
+                dep.source.json_path_or_key,
+                dep.target.request_id,
+                dep.target.json_path_or_key,
+                dep.dependency_type
+            );
+        }
+    }
+    Ok(())
+}
+
+fn cmd_sessions(cli: &Cli, args: &SessionsArgs) -> Result<(), HarflowError> {
+    let ws = ProjectWorkspace::open(&args.project)?;
+    if args.compare {
+        let comparison = ws.compare_sessions();
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&comparison)
+                    .map_err(|e| HarflowError::Storage(e.to_string()))?
+            );
+        } else {
+            println!(
+                "Session comparison ({} sessions): {} shared endpoints, {} session-only endpoints, {} corroborated deps, {} schema drifts",
+                comparison.session_ids.len(),
+                comparison.shared_endpoints.len(),
+                comparison.session_only_endpoints.len(),
+                comparison.corroborated_dependency_ids.len(),
+                comparison.schema_drifts.len()
+            );
+        }
+    } else {
+        let lifecycle = ws.session_lifecycle();
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&lifecycle)
+                    .map_err(|e| HarflowError::Storage(e.to_string()))?
+            );
+        } else {
+            println!(
+                "Session lifecycle: {} auth flows, {} rotations, {} expiration signals, autoRefreshEligible={}",
+                lifecycle.auth_flows.len(),
+                lifecycle.token_rotations.len(),
+                lifecycle.expiration_signals.len(),
+                lifecycle.auto_refresh_eligible
+            );
+        }
+    }
+    Ok(())
+}
+
 fn cmd_graph(cli: &Cli, args: &GraphArgs) -> Result<(), HarflowError> {
     let ws = ProjectWorkspace::open(&args.project)?;
-    let graph = build_endpoint_graph(&ws.model);
+    let graph = ws.build_graph(args.kind.into());
     let _ = args.format;
     let rendered =
         serde_json::to_string_pretty(&graph).map_err(|e| HarflowError::Storage(e.to_string()))?;

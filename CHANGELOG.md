@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Phase 3 (Dependency Engine & Session Intelligence):
+  - Credential-payload redacted fingerprint correlation (`parse_redacted_marker`, `fingerprint_secret` in `harflow-security`) matching JSON token fields (`access_token`) with `Authorization: Bearer ...` headers without persisting raw secrets.
+  - Linear-time $O(N)$ Dependency Detection Engine (`harflow-dependencies`) with chronological per-session timelines, 8-location producer/consumer extraction, `Identity`/`PrefixSuffix`/`UrlEncoding`/`Base64`/`JsonExtract` matching, pre-existing client & weak-scalar exclusion filters, and calibrated $C = 0.30V + 0.20T + 0.20U + 0.20R + 0.10S$ confidence scoring.
+  - Full 5-perspective `GraphViewModel` builder (`build_graph`) and cycle contradiction analyzer (`analyze_graph_cycles` in `harflow-graph`) distinguishing pagination self-loops from request-level contradictions, plus synced `schemas/graph.schema.json` and `@harflow/shared-types`.
+  - Session Intelligence & Multi-HAR comparison (`harflow-sessions`) covering `Bearer`, `CookieSession`, `Csrf`, `ApiKey`, `OauthLike`, signature hooks, redacted token rotations, expiration signals, parameter variability (`Constant`/`SessionScoped`/`RequestVolatile`), and schema drift diffing.
+  - Workspace workflow synthesis, manual override retention across re-analysis, CLI commands (`harflow dependencies`, `harflow sessions`, `harflow graph --kind`), curated primary & unseen holdout precision/recall/F1 suites (`confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`), and Phase 3 1k/10k release baseline (`benchmarks/results/phase3-baseline.json`).
 - Phase 2 (Traffic Intelligence):
   - 13-category rule-based traffic classifier (`harflow-classifier`) with CORS `OPTIONS` preflight detection, `CleanerConfig` / `CustomCleanerRule` support, explainable rule reasons, logical session filtering (`filter_sessions`), and preview/exclusion/restore overrides.
   - Two-pass Endpoint Discovery engine (`harflow-endpoints`) with sibling-slug clustering keyed by preceding segment, static small-digit version preservation (`/v1/`, `/api/2/`), prefixed ID detection, singularized parameter naming, typed optional query inference, status distributions, and priority pagination detection (`Cursor > PageNumber > OffsetLimit`).

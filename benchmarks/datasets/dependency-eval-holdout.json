@@ -1,0 +1,189 @@
+{
+  "name": "Phase 3 Holdout Dependency Evaluation Dataset",
+  "scenarios": [
+    {
+      "id": "cicd_pipeline_runner_holdout",
+      "description": "Unseen CI/CD login cookie + CSRF header/form, pipeline ID -> Path, and URL-encoded JsonExtract query filter",
+      "sessions": [
+        {
+          "sessionId": "sess-ci-holdout",
+          "sourceName": "ci-holdout.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T18:00:00Z",
+                  "time": 11.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://ci.example.test/v1/auth/login",
+                    "postData": { "mimeType": "application/json", "text": "{\"username\":\"runner\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "headers": [{ "name": "Set-Cookie", "value": "ci_sid=hf_synthetic_ci_sid_1; HttpOnly" }],
+                    "content": { "mimeType": "application/json", "text": "{\"csrf_token\":\"hf_synthetic_ci_csrf_1\",\"expires_in\":1800,\"ok\":true}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T18:00:01Z",
+                  "time": 15.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://ci.example.test/v1/pipelines/trigger",
+                    "headers": [
+                      { "name": "Cookie", "value": "ci_sid=hf_synthetic_ci_sid_1" },
+                      { "name": "X-CSRF-Token", "value": "hf_synthetic_ci_csrf_1" }
+                    ],
+                    "postData": { "mimeType": "application/x-www-form-urlencoded", "text": "repo=harflow&branch=main&csrf_token=hf_synthetic_ci_csrf_1" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"pipelineId\":\"pip_synthetic_901\",\"runs\":[{\"runId\":\"run_synthetic_55\"}],\"status\":\"queued\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T18:00:02Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://ci.example.test/v1/pipelines/pip_synthetic_901/runs?filter=%7B%22runId%22%3A%22run_synthetic_55%22%7D",
+                    "headers": [
+                      { "name": "Cookie", "value": "ci_sid=hf_synthetic_ci_sid_1" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"status\":\"queued\",\"logs\":[]}" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /v1/auth/login", "sourceLocation": "set_cookie", "sourceKey": "ci_sid", "targetEndpoint": "POST /v1/pipelines/trigger", "targetLocation": "cookie", "targetKey": "ci_sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /v1/auth/login", "sourceLocation": "set_cookie", "sourceKey": "ci_sid", "targetEndpoint": "GET /v1/pipelines/{pipeline_id}/runs", "targetLocation": "cookie", "targetKey": "ci_sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /v1/auth/login", "sourceLocation": "response_body", "sourceKey": "$.csrf_token", "targetEndpoint": "POST /v1/pipelines/trigger", "targetLocation": "header", "targetKey": "X-CSRF-Token", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "POST /v1/auth/login", "sourceLocation": "response_body", "sourceKey": "$.csrf_token", "targetEndpoint": "POST /v1/pipelines/trigger", "targetLocation": "body", "targetKey": "csrf_token", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "POST /v1/pipelines/trigger", "sourceLocation": "response_body", "sourceKey": "$.pipelineId", "targetEndpoint": "GET /v1/pipelines/{pipeline_id}/runs", "targetLocation": "path", "targetKey": "pipeline_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/pipelines/trigger", "sourceLocation": "response_body", "sourceKey": "$.runs[*].runId", "targetEndpoint": "GET /v1/pipelines/{pipeline_id}/runs", "targetLocation": "query", "targetKey": "filter", "dependencyType": "response_to_query", "transformation": "json_extract" }
+      ]
+    },
+    {
+      "id": "saas_billing_and_webhook_holdout",
+      "description": "Unseen invoice pagination chain (after -> after), webhook invoiceId body propagation, pre-existing after=inv_0, and 500 error exclusion",
+      "sessions": [
+        {
+          "sessionId": "sess-inv-holdout",
+          "sourceName": "inv-holdout.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T19:00:00Z",
+                  "time": 10.0,
+                  "request": { "method": "GET", "url": "https://billing.example.test/v1/invoices?after=inv_0&limit=50" },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[{\"invoiceId\":\"inv_synthetic_4040\",\"total\":250}],\"after\":\"inv_synthetic_page2\",\"limit\":50}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T19:00:01Z",
+                  "time": 9.0,
+                  "request": { "method": "GET", "url": "https://billing.example.test/v1/invoices?after=inv_synthetic_page2&limit=50" },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[],\"after\":\"inv_synthetic_page3\",\"limit\":50}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T19:00:02Z",
+                  "time": 12.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://billing.example.test/v1/webhooks/deliver",
+                    "postData": { "mimeType": "application/json", "text": "{\"invoiceId\":\"inv_synthetic_4040\",\"ok\":true}" }
+                  },
+                  "response": { "status": 202, "content": { "mimeType": "application/json", "text": "{\"queued\":true}" } }
+                },
+                {
+                  "startedDateTime": "2026-11-18T19:00:03Z",
+                  "time": 8.0,
+                  "request": { "method": "GET", "url": "https://billing.example.test/v1/invoices/inv_synthetic_4040/receipt" },
+                  "response": {
+                    "status": 500,
+                    "content": { "mimeType": "application/json", "text": "{\"debugCode\":\"dbg_500_ignore\",\"message\":\"internal error\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T19:00:04Z",
+                  "time": 6.0,
+                  "request": { "method": "GET", "url": "https://billing.example.test/v1/audit?code=dbg_500_ignore" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"entries\":[]}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "GET /v1/invoices", "sourceLocation": "response_body", "sourceKey": "$.after", "targetEndpoint": "GET /v1/invoices", "targetLocation": "query", "targetKey": "after", "dependencyType": "pagination_chain" },
+        { "sourceEndpoint": "GET /v1/invoices", "sourceLocation": "response_body", "sourceKey": "$.items[*].invoiceId", "targetEndpoint": "POST /v1/webhooks/deliver", "targetLocation": "body", "targetKey": "$.invoiceId", "dependencyType": "response_to_body" },
+        { "sourceEndpoint": "GET /v1/invoices", "sourceLocation": "response_body", "sourceKey": "$.items[*].invoiceId", "targetEndpoint": "GET /v1/invoices/{invoice_id}/receipt", "targetLocation": "path", "targetKey": "invoice_id", "dependencyType": "response_to_path" }
+      ]
+    },
+    {
+      "id": "unseen_negative_coincidences_holdout",
+      "description": "Unseen config constants, small ints, booleans, currency, locale, and echoed client nonces alongside 1 valid path ID",
+      "sessions": [
+        {
+          "sessionId": "sess-neg-holdout",
+          "sourceName": "neg-holdout.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T20:00:00Z",
+                  "time": 5.0,
+                  "request": { "method": "GET", "url": "https://jobs.example.test/v1/config" },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"env\":\"prod\",\"retry\":3,\"timeout\":30,\"currency\":\"EUR\",\"locale\":\"en\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T20:00:01Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://jobs.example.test/v1/jobs",
+                    "postData": { "mimeType": "application/json", "text": "{\"env\":\"prod\",\"retry\":3,\"timeout\":30,\"currency\":\"EUR\",\"locale\":\"en\",\"clientNonce\":\"nonce_later_only\"}" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"job_synthetic_777\",\"echoNonce\":\"nonce_later_only\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T20:00:02Z",
+                  "time": 6.0,
+                  "request": { "method": "GET", "url": "https://jobs.example.test/v1/jobs/job_synthetic_777?nonce=nonce_later_only" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"ok\":true}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /v1/jobs", "sourceLocation": "response_body", "sourceKey": "$.id", "targetEndpoint": "GET /v1/jobs/{job_id}", "targetLocation": "path", "targetKey": "job_id", "dependencyType": "response_to_path" }
+      ]
+    }
+  ]
+}

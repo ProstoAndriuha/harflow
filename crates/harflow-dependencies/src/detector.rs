@@ -768,16 +768,14 @@ fn passes_pair_weak_filter(
     if prod.type_hint == ScalarTypeHint::String {
         let v = prod.value.trim();
         let all_alpha = v.bytes().all(|b| b.is_ascii_alphabetic());
-        if all_alpha && v.len() <= 3 {
-            let explicit_ids = (is_id_key(pk) || is_token_or_cursor_key(pk))
+        if all_alpha && v.len() <= 4 {
+            let explicit_id_or_token = (is_id_key(pk) || is_token_or_cursor_key(pk))
                 && (is_id_key(ck)
                     || is_token_or_cursor_key(ck)
                     || matches!(cons.location, ValueLocation::Path));
-            if !explicit_ids {
+            if !explicit_id_or_token {
                 return false;
             }
-        } else if all_alpha && v.len() <= 4 && !has_structural_alignment(pk, ck, cons) {
-            return false;
         }
     }
 
@@ -937,12 +935,6 @@ fn score_structural_compatibility(
             0.45
         }
     }
-}
-
-fn has_structural_alignment(pk: &str, ck: &str, cons: &CandidateValue) -> bool {
-    let pt = split_key_tokens(pk);
-    let ct = split_key_tokens(ck);
-    pt == ct || matches!(cons.location, ValueLocation::Path) || (is_id_key(pk) && is_id_key(ck))
 }
 
 fn shares_structural_prefix(norm_path: &str, c_tokens: &[String]) -> bool {
@@ -1323,17 +1315,17 @@ fn compute_candidate_uniqueness(prod: &CandidateValue, index: &SessionIndex) -> 
         ScalarTypeHint::String => {
             let v = prod.value.trim();
             let has_digit = v.bytes().any(|b| b.is_ascii_digit());
-            let has_punct = v.bytes().any(|b| b == b'_' || b == b'-');
+            let has_punct = v.bytes().any(|b| matches!(b, b'_' | b'-' | b':' | b'/'));
             if v.len() >= 8 && (has_digit || has_punct) {
                 0.95
             } else if v.len() >= 4 && (has_digit || has_punct) {
                 0.90
-            } else if v.len() >= 8 {
-                0.88
-            } else if v.len() >= 4 {
-                0.85
+            } else if v.len() > 12 {
+                0.78
+            } else if v.len() > 6 {
+                0.68
             } else {
-                0.70
+                0.55
             }
         }
     };

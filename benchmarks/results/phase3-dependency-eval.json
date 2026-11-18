@@ -1,0 +1,148 @@
+{
+  "holdout": {
+    "confirmedPrecision": 1.0,
+    "datasetName": "Phase 3 Holdout Dependency Evaluation Dataset",
+    "detectedTotal": 10,
+    "directRecall": 1.0,
+    "f1": 1.0,
+    "falsePositivesConfirmed": 0,
+    "groundTruthTotal": 10,
+    "scenarios": [
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 6,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 6,
+        "missedGroundTruth": [],
+        "scenarioId": "cicd_pipeline_runner_holdout",
+        "truePositivesConfirmed": 4,
+        "truePositivesDetected": 6,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 3,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 3,
+        "missedGroundTruth": [],
+        "scenarioId": "saas_billing_and_webhook_holdout",
+        "truePositivesConfirmed": 2,
+        "truePositivesDetected": 3,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 1,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 1,
+        "missedGroundTruth": [],
+        "scenarioId": "unseen_negative_coincidences_holdout",
+        "truePositivesConfirmed": 1,
+        "truePositivesDetected": 1,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      }
+    ],
+    "truePositivesConfirmed": 7,
+    "truePositivesDetected": 10,
+    "unEvidencedConfirmed": 0
+  },
+  "phase": "Phase 3 Dependency Evaluation (Primary & Unseen Holdout)",
+  "primary": {
+    "confirmedPrecision": 1.0,
+    "datasetName": "Phase 3 Primary Dependency Evaluation Dataset",
+    "detectedTotal": 29,
+    "directRecall": 1.0,
+    "f1": 1.0,
+    "falsePositivesConfirmed": 0,
+    "groundTruthTotal": 29,
+    "scenarios": [
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 11,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 11,
+        "missedGroundTruth": [],
+        "scenarioId": "ecommerce_order_flow",
+        "truePositivesConfirmed": 11,
+        "truePositivesDetected": 11,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 3,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 3,
+        "missedGroundTruth": [],
+        "scenarioId": "url_base64_and_header_propagation",
+        "truePositivesConfirmed": 0,
+        "truePositivesDetected": 3,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 6,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 6,
+        "missedGroundTruth": [],
+        "scenarioId": "oauth_rotation_and_csrf",
+        "truePositivesConfirmed": 6,
+        "truePositivesDetected": 6,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 0,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 0,
+        "missedGroundTruth": [],
+        "scenarioId": "cross_session_isolation_and_weak_distractors",
+        "truePositivesConfirmed": 0,
+        "truePositivesDetected": 0,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 4,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 4,
+        "missedGroundTruth": [],
+        "scenarioId": "location_header_and_nested_workspace_ids",
+        "truePositivesConfirmed": 4,
+        "truePositivesDetected": 4,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      },
+      {
+        "confirmedPrecision": 1.0,
+        "detectedTotal": 5,
+        "directRecall": 1.0,
+        "falsePositivesConfirmed": 0,
+        "groundTruthTotal": 5,
+        "missedGroundTruth": [],
+        "scenarioId": "api_key_and_array_element_extraction",
+        "truePositivesConfirmed": 3,
+        "truePositivesDetected": 5,
+        "unEvidencedConfirmed": 0,
+        "unexpectedConfirmed": []
+      }
+    ],
+    "truePositivesConfirmed": 24,
+    "truePositivesDetected": 29,
+    "unEvidencedConfirmed": 0
+  }
+}

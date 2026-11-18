@@ -84,3 +84,22 @@ fn primary_dataset_meets_precision_recall_and_evidence_targets() {
     );
     assert_eq!(summary.un_evidenced_confirmed, 0);
 }
+
+#[test]
+fn holdout_dataset_meets_precision_recall_and_evidence_targets() {
+    let summary = run_dataset("benchmarks/datasets/dependency-eval-holdout.json");
+
+    assert!(
+        summary.confirmed_precision >= 0.98,
+        "holdout confirmed precision {:.4} < 0.98; scenarios: {:#?}",
+        summary.confirmed_precision,
+        summary.scenarios
+    );
+    assert!(
+        summary.direct_recall >= 0.85,
+        "holdout direct recall {:.4} < 0.85; scenarios: {:#?}",
+        summary.direct_recall,
+        summary.scenarios
+    );
+    assert_eq!(summary.un_evidenced_confirmed, 0);
+}

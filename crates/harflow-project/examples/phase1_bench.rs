@@ -83,7 +83,7 @@ fn main() {
     let r10k = bench_count(10_000, 5);
 
     let report = json!({
-        "phase": "Import, Redaction, Normalization, SQLite Index, Cleaner, Endpoint Discovery & Schema Inference",
+        "phase": "Import, Redaction, Normalization, SQLite Index, Cleaner, Endpoint Discovery, Schema Inference, Dependency Detection & Session Intelligence",
         "profile": if cfg!(debug_assertions) { "debug" } else { "release" },
         "results": [r1k, r10k],
     });

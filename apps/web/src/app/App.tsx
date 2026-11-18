@@ -5,6 +5,8 @@ import { useHarflowStore } from '../hooks/useHarflowStore.js';
 import { DICTIONARIES, I18nContext, type Locale } from '../i18n/index.js';
 import { DashboardPage } from '../pages/DashboardPage.js';
 import { DependencyGraphPage } from '../pages/DependencyGraphPage.js';
+import { EndpointsSchemasPage } from '../pages/EndpointsSchemasPage.js';
+import { SessionsComparisonPage } from '../pages/SessionsComparisonPage.js';
 import { SettingsPage } from '../pages/SettingsPage.js';
 import { TrafficExplorerPage } from '../pages/TrafficExplorerPage.js';
 import { createApplicationAdapter } from '../services/applicationAdapter.js';
@@ -24,6 +26,7 @@ export function App({ adapter: providedAdapter }: AppProps) {
     canUndoAction,
     canRedoAction,
     selectEntry,
+    selectEndpoint,
     selectDependency,
     setGraphKind,
     loadDemoProject,
@@ -32,6 +35,7 @@ export function App({ adapter: providedAdapter }: AppProps) {
     rejectDependency,
     editDependencyMapping,
     updateCleaner,
+    setEndpointOverride,
     undo,
     redo,
     exportArtifact,
@@ -93,6 +97,16 @@ export function App({ adapter: providedAdapter }: AppProps) {
             />
           ) : null}
 
+          {activeTab === 'endpoints' ? (
+            <EndpointsSchemasPage
+              endpoints={state.model?.endpoints ?? []}
+              schemas={state.model?.schemas ?? []}
+              selectedEndpointId={state.selectedEndpointId}
+              onSelectEndpoint={selectEndpoint}
+              onOverrideEndpoint={setEndpointOverride}
+            />
+          ) : null}
+
           {activeTab === 'dependencies' ? (
             <DependencyGraphPage
               dependencies={state.model?.dependencies ?? []}
@@ -109,6 +123,14 @@ export function App({ adapter: providedAdapter }: AppProps) {
               onUndo={undo}
               onRedo={redo}
               onExportGraph={(format) => exportArtifact(format, state.graphKind)}
+            />
+          ) : null}
+
+          {activeTab === 'sessions' ? (
+            <SessionsComparisonPage
+              sources={state.model?.sources ?? []}
+              lifecycle={state.sessionLifecycle}
+              comparison={state.sessionComparison}
             />
           ) : null}
 

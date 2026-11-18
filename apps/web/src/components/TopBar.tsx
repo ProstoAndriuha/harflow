@@ -26,7 +26,9 @@ export function TopBar({
   const tabs: Array<{ id: ActiveTab; label: string }> = [
     { id: 'dashboard', label: t.nav.dashboard },
     { id: 'traffic', label: t.nav.traffic },
+    { id: 'endpoints', label: t.nav.endpoints },
     { id: 'dependencies', label: t.nav.dependencies },
+    { id: 'sessions', label: t.nav.sessions },
     { id: 'settings', label: t.nav.settings },
   ];
 

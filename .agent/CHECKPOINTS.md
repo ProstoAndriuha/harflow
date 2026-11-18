@@ -123,3 +123,41 @@
   - Native Tauri 2 desktop bundling remains deferred to Phase 7 per `ADR-0001`.
 - **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
 - **Recommended Next Task:** `P4-01` — Application state store, undo/redo history stack & `InMemoryApplicationAdapter` parity with Phase 2/3 cleaner, schemas, graph views & session intelligence (`apps/web`, `packages/shared-types`).
+
+## CP-005 — Phase 4 (Professional UI)
+
+- **Timestamp:** 2026-11-18T05:02:00+02:00
+- **Task IDs:** `P4-01`, `P4-02`, `P4-03`, `P4-04`, `P4-05`, `P4-06`
+- **Baseline Commit SHA:** `e4bf2f1a2fca4c4c02233375855fb11059c506a4` (`e4bf2f1`)
+- **Changed Modules:**
+  - `packages/shared-types/src/{intelligence,project,commands,index}.ts`, `packages/shared-types/src/__tests__/commands-parity.test.ts`
+  - `packages/ui/src/{VirtualTable,DependencyGraphCanvas,index}.ts*`, `packages/ui/src/__tests__/VirtualTable.test.tsx`
+  - `apps/web/src/features/{harImport,intelligenceEngine,graphBuilder}.ts`
+  - `apps/web/src/stores/{historyStack,projectStore}.ts`, `apps/web/src/hooks/useHarflowStore.ts`, `apps/web/src/services/applicationAdapter.ts`
+  - `apps/web/src/components/{SmartCleanerBar,RequestInspector,SchemaTreeView,CommandPalette,HarDropzone,TopBar}.tsx`
+  - `apps/web/src/pages/{DashboardPage,TrafficExplorerPage,EndpointsSchemasPage,DependencyGraphPage,SessionsComparisonPage,SettingsPage}.tsx`
+  - `apps/web/src/i18n/{en,ru}.ts`, `apps/web/src/styles/theme.css`, `apps/web/src/app/App.tsx`
+  - `apps/web/src/__tests__/{storeAndAdapter.test.ts,TrafficExplorer.test.tsx,DependencyGraphStudio.test.tsx,EndpointsAndSessions.test.tsx,Phase4AccessibilityAndUx.test.tsx}`
+  - Docs & tracking: `docs/user-guide/README.md`, `CHANGELOG.md`, `.agent/{TASKS,PROJECT_STATE,SESSION_LOG}.md`
+- **Verified Functionality:**
+  - Phase 2/3 client-side analytical parity in `InMemoryApplicationAdapter` (13-category Smart Cleaner with custom rules/preview/soft-exclude/restore, endpoint clustering, recursive schema inference, chronological dependency detection with override retention, session lifecycle & multi-HAR comparison, all 5 graph perspectives, SVG/JSON/OpenAPI export with secret-leakage guard) while preserving the exact 16-command Tauri desktop contract (`apps/desktop` bridge test passing).
+  - Bounded Undo/Redo history stack wired to dependency confirm/reject/mapping edits, Smart Cleaner updates, and endpoint template overrides (toolbar buttons + `Ctrl+Z`/`Ctrl+Y`/`Ctrl+Shift+Z` outside text inputs).
+  - Window-virtualized `VirtualTable` (`10,000` rows rendered with `< 40` DOM rows), multi-filter Traffic Explorer, Smart Cleaner bar, and accessible 8-tab `RequestInspector` (`Overview`, `Headers`, `Query`, `Cookies`, `Body`, `Response`, `Timing`, `Security`).
+  - Interactive `DependencyGraphCanvas` + 3-pane `DependencyGraphPage` (5 perspectives, zoom/pan/fit/reset, path highlight, cycle indicator, non-color status badges, evidence/mapping inspector, SVG/JSON export).
+  - `EndpointsSchemasPage` (template overrides, pagination/status distributions, recursive `SchemaTreeView` with `required`/`optional`/`nullable`/`enum`/`union` & TypeScript/Pydantic previews) and `SessionsComparisonPage` (M08 redacted token rotations & `401`/`403` expiration signals, M09 parameter variability & schema drift).
+  - `CommandPalette` (`Ctrl+K` / `Cmd+K`), `Alt+1`..`Alt+6` shortcuts, multi-file `.har`/`.har.gz` `HarDropzone` via Web `DecompressionStream` with decompression-bomb byte cap, 100% recursive EN/RU dictionary parity, skip-to-content link, ARIA landmarks, and Dark/Light themes.
+- **Tests & Checks Executed:**
+  - `pnpm install --frozen-lockfile` -> exit `0`
+  - `pnpm lint` (`eslint .`) -> exit `0`
+  - `pnpm -r typecheck` (`shared-types`, `desktop`, `ui`, `web`) -> exit `0`
+  - `pnpm -r test` -> exit `0` (`18/18` Vitest tests passed across `11` test files: `shared-types` `4/4`, `desktop` `1/1`, `ui` `2/2`, `web` `11/11`)
+  - `pnpm build` -> exit `0` (`dist/index.html` `0.42 kB`, `index-Dp_dPJto.css` `3.89 kB`, `index-D4FW6gdq.js` `375.43 kB` / gzip `111.24 kB`)
+  - `cargo fmt --all -- --check` -> exit `0`
+  - `cargo clippy --workspace --all-targets -- -D warnings` -> exit `0`
+  - `cargo test --workspace` -> exit `0` (`54/54` Rust workspace tests passed across all 18 crates, `cli_smoke`, `precision_recall_eval`, `phase2_intelligence_golden`, `property_invariants`, `redaction_fixture`, `repo_secret_scan`)
+- **Known Limitations:**
+  - Web SDK Studio & real Rust SDK ZIP generation (`harflow-generator`, `harflow-openapi`) remain scheduled for Phase 5 (`P5-01`..`P5-06`).
+  - Native Tauri 2 desktop bundling (`apps/desktop`) remains deferred to Phase 7 per `ADR-0001`.
+  - GitHub Actions cloud runners on `ProstoAndriuha/harflow` remain gated by a remote GitHub account billing lock; all CI gates were verified locally.
+- **Remote Sync Target:** `origin/main` (`https://github.com/ProstoAndriuha/harflow`).
+- **Recommended Next Task:** `P5-01` — OpenAPI 3.1 generator (`paths`, `parameters`, `requestBody`, `responses`, `$ref` schemas, `securitySchemes`, diagnostics) (`crates/harflow-openapi`).

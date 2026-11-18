@@ -1,7 +1,7 @@
 # HARFlow Project State
 
-**Last Updated**: 2026-11-18T04:26:00+02:00
-**Current Milestone**: Phase 3 — Dependency Engine & Session Intelligence (`DONE`) -> Phase 4 — Professional UI (`READY`)
+**Last Updated**: 2026-11-18T05:02:00+02:00
+**Current Milestone**: Phase 4 — Professional UI (`DONE`) -> Phase 5 — SDK & OpenAPI Generators (`READY`)
 **Repository**: `https://github.com/ProstoAndriuha/harflow` (`origin/main`)
 
 ## Phase Summary
@@ -9,22 +9,24 @@
 - **Phase 0 (Foundation)**: `DONE` (Checkpoint `CP-001`, commit `49d8512`, pushed to `origin/main`)
 - **Phase 1 (Import & Normalization)**: `DONE` (Checkpoint `CP-002`, commit `f54c9a5`, pushed to `origin/main`)
 - **Phase 2 (Traffic Intelligence)**: `DONE` (Checkpoint `CP-003`, commit `5202805` / `4d902f9`, pushed to `origin/main`)
-- **Phase 3 (Dependency Engine & Session Intelligence)**: `DONE` (Checkpoint `CP-004`, baseline commit `8111785`, synced to `origin/main`)
-- **Phase 4 (Professional UI)**: `READY` (`P4-01`..`P4-06` planned in `.agent/TASKS.md`)
-- **Phases 5–8**: `TODO` (SDK/OpenAPI Export, Mock Replay, Tauri Desktop, Optional Sanitized AI)
+- **Phase 3 (Dependency Engine & Session Intelligence)**: `DONE` (Checkpoint `CP-004`, baseline commit `8111785` / `9037376`, synced to `origin/main`)
+- **Phase 4 (Professional UI)**: `DONE` (Checkpoint `CP-005`, baseline commit `e4bf2f1`, synced to `origin/main`)
+- **Phase 5 (SDK & OpenAPI Generators)**: `READY` (`P5-01`..`P5-06` planned in `.agent/TASKS.md`)
+- **Phases 6–8**: `TODO` (Mock Replay, Tauri Desktop, Optional Sanitized AI)
 
 ## Verified Baseline & Capabilities
 
-- **Dependency Detection (`harflow-dependencies`, `harflow-security`)**: Credential-payload fingerprint correlation (`parse_redacted_marker`, `fingerprint_secret`), chronological per-session timelines, 8-location extractors, linear $O(N)$ forward hash index supporting `Identity`, `PrefixSuffix`, `UrlEncoding`, `Base64`, and `JsonExtract`, weak-scalar/pre-existing-client filters, calibrated $C = 0.30V + 0.20T + 0.20U + 0.20R + 0.10S$ confidence scoring, and cross-session corroboration/contradiction handling.
-- **Graph Engine (`harflow-graph`, `schemas/graph.schema.json`, `shared-types`)**: All 5 M10 graph perspectives (`build_graph`) and request-vs-endpoint cycle contradiction peeling (`analyze_graph_cycles`).
-- **Session Intelligence & Multi-HAR Comparison (`harflow-sessions`)**: `Bearer`, `CookieSession`, `Csrf`, `ApiKey`, `OauthLike`, and custom signature detection; redacted token rotations, expiration signals, strict `auto_refresh_eligible`; Multi-HAR parameter variability (`Constant`, `SessionScoped`, `RequestVolatile`), auth differences, and schema drift reports.
-- **Workspace & CLI Integration (`harflow-project`, `harflow-cli`)**: End-to-end `analyze()` dependency detection, workflow synthesis, cycle contradiction diagnostics, manual override preservation, `harflow dependencies`, `harflow sessions`, and `harflow graph --kind`.
-- **Phase 3 Accuracy & Performance (`--release`, `benchmarks/results/phase3-dependency-eval.json`, `benchmarks/results/phase3-baseline.json`)**:
-  - Primary Dataset (`29` ground-truth edges): `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`
-  - Unseen Holdout Dataset (`10` ground-truth edges): `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`
-  - 1,000 requests full pipeline (5 runs): `p50 = 169.67 ms`, `p95 = 198.45 ms` (SRS budget `< 1,000 ms`)
-  - 10,000 requests full pipeline (5 runs): `p50 = 1,650.61 ms`, `p95 = 2,309.88 ms` (SRS budget `< 5,000 ms`)
-- **Verification Status**: `54/54` Rust workspace tests and `5` frontend Vitest tests (`4` test files) across `apps/web`, `apps/desktop`, and `packages/*` passing; repository secret hygiene scan active (`repo_secret_scan`).
+- **Professional Web Studio (`apps/web`, `packages/ui`, `packages/shared-types`)**:
+  - Client-side Phase 2/3 analytical parity in `InMemoryApplicationAdapter` preserving the 16-command desktop contract (`apps/desktop` bridge verified).
+  - Bounded Undo/Redo history stack (`historyStack.ts`) with toolbar buttons and `Ctrl+Z`/`Ctrl+Y`/`Ctrl+Shift+Z` shortcuts for dependency edits, cleaner updates, and endpoint template overrides.
+  - Windowed `VirtualTable` (`10k` rows), multi-filter Traffic Explorer, Smart Cleaner bar (13 categories, custom rules, preview diff, soft exclude/restore), and accessible 8-tab `RequestInspector`.
+  - Interactive `DependencyGraphCanvas` + 3-pane `DependencyGraphPage` (all 5 perspectives, zoom/pan/fit/reset, path highlight, cycle warning, non-color badges, evidence/mapping inspector, SVG/JSON export).
+  - `EndpointsSchemasPage` (recursive `SchemaTreeView`, TS/Pydantic previews, template overrides) and `SessionsComparisonPage` (M08 token rotations & expiration signals, M09 parameter variability & schema drift).
+  - Global `CommandPalette` (`Ctrl+K`), `Alt+1..6` shortcuts, multi-file `.har`/`.har.gz` `HarDropzone` (`DecompressionStream` with byte limit guard), 100% EN/RU dictionary parity, skip link, and Dark/Light themes.
+- **Rust Core & Intelligence Baseline**:
+  - Primary (`29` edges) & Holdout (`10` edges) dependency evaluation: `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`.
+  - 1,000 requests pipeline: `p50 = 169.67 ms`, `p95 = 198.45 ms` (`< 1,000 ms`); 10,000 requests pipeline: `p50 = 1,650.61 ms`, `p95 = 2,309.88 ms` (`< 5,000 ms`).
+- **Verification Status**: `54/54` Rust workspace tests (`cargo test --workspace` including `repo_secret_scan`) and `18/18` Vitest tests (`11` test files across `shared-types`, `desktop`, `ui`, `web`), `eslint .`, `tsc`, and `vite build` (`375.43 kB` JS / `3.89 kB` CSS) all passing.
 
 ## Open Risks & Limitations
 
@@ -33,4 +35,4 @@
 
 ## Next Recommended Task
 
-- **`P4-01`**: Application state store, undo/redo history stack & `InMemoryApplicationAdapter` parity with Phase 2/3 cleaner, schemas, graph views & session intelligence (`apps/web`, `packages/shared-types`).
+- **`P5-01`**: OpenAPI 3.1 generator (`paths`, `parameters`, `requestBody`, `responses`, `$ref` schemas, `securitySchemes`, diagnostics) (`crates/harflow-openapi`).

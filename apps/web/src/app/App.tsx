@@ -21,12 +21,20 @@ export function App({ adapter: providedAdapter }: AppProps) {
   );
   const {
     state,
+    canUndoAction,
+    canRedoAction,
     selectEntry,
+    selectDependency,
+    setGraphKind,
     loadDemoProject,
     importHarText,
     confirmDependency,
     rejectDependency,
+    editDependencyMapping,
     updateCleaner,
+    undo,
+    redo,
+    exportArtifact,
   } = useHarflowStore(adapter);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -88,8 +96,19 @@ export function App({ adapter: providedAdapter }: AppProps) {
           {activeTab === 'dependencies' ? (
             <DependencyGraphPage
               dependencies={state.model?.dependencies ?? []}
+              graph={state.graph}
+              graphKind={state.graphKind}
+              selectedDependencyId={state.selectedDependencyId}
+              canUndo={canUndoAction}
+              canRedo={canRedoAction}
+              onChangeGraphKind={setGraphKind}
+              onSelectDependency={selectDependency}
               onConfirm={confirmDependency}
               onReject={rejectDependency}
+              onEditMapping={editDependencyMapping}
+              onUndo={undo}
+              onRedo={redo}
+              onExportGraph={(format) => exportArtifact(format, state.graphKind)}
             />
           ) : null}
 

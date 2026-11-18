@@ -86,6 +86,19 @@ code,
   gap: 0.85rem;
 }
 
+.hf-studio-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 290px;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .hf-studio-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .hf-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--hf-border);

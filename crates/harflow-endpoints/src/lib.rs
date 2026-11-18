@@ -72,7 +72,7 @@ pub fn discover_endpoints_with_overrides(
         path_segments_cache.push(segs);
     }
 
-    // Track which interior segments act as varying slugs between identical static neighbors.
+    // Track interior and guarded terminal segments acting as varying resource slugs.
     let mut sibling_slug_positions: BTreeSet<(String, String, usize, usize)> = BTreeSet::new();
     let mut entries_by_shape: BTreeMap<(String, String, usize), Vec<&[String]>> = BTreeMap::new();
     for (entry, segs) in entries.iter().zip(path_segments_cache.iter()) {
@@ -83,18 +83,20 @@ pub fn discover_endpoints_with_overrides(
     }
 
     for ((method, host, seg_count), group_paths) in &entries_by_shape {
-        if *seg_count < 3 || group_paths.len() < 3 {
+        if *seg_count < 2 || group_paths.len() < 3 {
             continue;
         }
-        for pos in 1..(seg_count - 1) {
-            let mut context_groups: BTreeMap<(&str, &str), BTreeSet<&str>> = BTreeMap::new();
+        for pos in 1..(*seg_count - 1) {
+            let mut context_groups: BTreeMap<(&str, &str, Option<&str>), BTreeSet<&str>> =
+                BTreeMap::new();
             for segs in group_paths {
                 let left = segs[pos - 1].as_str();
                 let right = segs[pos + 1].as_str();
+                let (stem, suffix) = split_format_suffix(&segs[pos]);
                 context_groups
-                    .entry((left, right))
+                    .entry((left, right, suffix))
                     .or_default()
-                    .insert(segs[pos].as_str());
+                    .insert(stem);
             }
 
             if context_groups.values().any(|vals| {
@@ -105,6 +107,35 @@ pub fn discover_endpoints_with_overrides(
             }) {
                 sibling_slug_positions.insert((method.clone(), host.clone(), *seg_count, pos));
             }
+        }
+
+        // Guarded terminal slug detection (e.g., `/api/v2/pokemon/{pikachu,charizard,bulbasaur}`).
+        let terminal_pos = *seg_count - 1;
+        let mut terminal_groups: BTreeMap<(&str, Option<&str>), BTreeSet<&str>> = BTreeMap::new();
+        for segs in group_paths {
+            let parent = segs[terminal_pos - 1].as_str();
+            if parent.eq_ignore_ascii_case("api")
+                || is_version_segment(parent)
+                || is_auth_parent_segment(parent)
+            {
+                continue;
+            }
+            let (stem, suffix) = split_format_suffix(&segs[terminal_pos]);
+            terminal_groups
+                .entry((parent, suffix))
+                .or_default()
+                .insert(stem);
+        }
+
+        if terminal_groups.values().any(|vals| {
+            vals.len() >= 3
+                && vals.iter().all(|v| {
+                    !is_version_segment(v)
+                        && !is_static_keyword(v)
+                        && !is_common_collection_or_action(v)
+                })
+        }) {
+            sibling_slug_positions.insert((method.clone(), host.clone(), *seg_count, terminal_pos));
         }
     }
 
@@ -294,20 +325,20 @@ fn parameterize_segments(
             pos,
         ));
 
-        let maybe_kind =
-            classify_segment_param(segment, prev, sibling_cardinality, is_sibling_slug);
+        let (stem, suffix) = split_format_suffix(segment);
+        let maybe_kind = classify_segment_param(stem, prev, sibling_cardinality, is_sibling_slug);
         if let Some(kind) = maybe_kind {
             let base_name = singularize_param_name(prev);
             let mut param_name = base_name.clone();
-            let mut suffix = 2usize;
+            let mut suffix_idx = 2usize;
             while used_names.contains(&param_name) {
-                param_name = format!("{base_name}_{suffix}");
-                suffix += 1;
+                param_name = format!("{base_name}_{suffix_idx}");
+                suffix_idx += 1;
             }
             used_names.insert(param_name.clone());
             param_names.push((param_name.clone(), kind));
-            raw_captured.push(segment.clone());
-            out_segments.push(format!("{{{param_name}}}"));
+            raw_captured.push(stem.to_string());
+            out_segments.push(format!("{{{param_name}}}{}", suffix.unwrap_or("")));
         } else {
             out_segments.push(segment.clone());
         }
@@ -368,6 +399,61 @@ fn is_version_segment(segment: &str) -> bool {
     matches!(
         lower.as_str(),
         "oauth2" | "web3" | "2fa" | "mfa" | "3ds" | "s3" | "base64" | "sha256"
+    )
+}
+
+fn split_format_suffix(segment: &str) -> (&str, Option<&str>) {
+    for suffix in [".json", ".xml"] {
+        if segment.len() > suffix.len() {
+            let stem_len = segment.len() - suffix.len();
+            if let (Some(stem), Some(ext)) = (segment.get(..stem_len), segment.get(stem_len..)) {
+                if ext.eq_ignore_ascii_case(suffix) {
+                    return (stem, Some(ext));
+                }
+            }
+        }
+    }
+    (segment, None)
+}
+
+fn is_auth_parent_segment(segment: &str) -> bool {
+    matches!(
+        segment.to_ascii_lowercase().as_str(),
+        "auth" | "oauth" | "oauth2" | "sso" | "saml" | "admin"
+    )
+}
+
+fn is_common_collection_or_action(segment: &str) -> bool {
+    matches!(
+        segment.to_ascii_lowercase().as_str(),
+        "users"
+            | "orders"
+            | "products"
+            | "items"
+            | "carts"
+            | "posts"
+            | "comments"
+            | "tokens"
+            | "sessions"
+            | "events"
+            | "logs"
+            | "accounts"
+            | "roles"
+            | "permissions"
+            | "files"
+            | "images"
+            | "docs"
+            | "login"
+            | "logout"
+            | "refresh"
+            | "register"
+            | "signin"
+            | "signup"
+            | "token"
+            | "topstories"
+            | "newstories"
+            | "beststories"
+            | "updates"
     )
 }
 
@@ -433,7 +519,9 @@ fn singularize_param_name(prev_segment: Option<&str>) -> String {
         return "id".to_string();
     }
 
-    let singular = if let Some(stem) = clean.strip_suffix("ies") {
+    let singular = if clean.ends_with("species") || clean.ends_with("series") {
+        clean.to_string()
+    } else if let Some(stem) = clean.strip_suffix("ies") {
         if stem.is_empty() {
             clean.to_string()
         } else {
@@ -453,8 +541,16 @@ fn singularize_param_name(prev_segment: Option<&str>) -> String {
 fn extract_template_params(template: &str) -> Vec<(String, SegmentParamKind)> {
     template
         .split('/')
-        .filter(|s| s.starts_with('{') && s.ends_with('}') && s.len() > 2)
-        .map(|s| (s[1..s.len() - 1].to_string(), SegmentParamKind::SiblingSlug))
+        .filter_map(|s| {
+            let open = s.find('{')?;
+            let close = s.find('}')?;
+            (close > open + 1).then(|| {
+                (
+                    s[open + 1..close].to_string(),
+                    SegmentParamKind::SiblingSlug,
+                )
+            })
+        })
         .collect()
 }
 
@@ -524,7 +620,7 @@ fn classify_pagination_query_key(name: &str) -> Option<PaginationStyle> {
             Some(PaginationStyle::Cursor)
         }
         "page" | "per_page" | "page_size" => Some(PaginationStyle::PageNumber),
-        "offset" | "limit" => Some(PaginationStyle::OffsetLimit),
+        "offset" | "limit" | "skip" => Some(PaginationStyle::OffsetLimit),
         _ => None,
     }
 }
@@ -713,5 +809,66 @@ mod tests {
             pagination.response_next_field.as_deref(),
             Some("nextCursor")
         );
+    }
+
+    #[test]
+    fn clusters_format_suffixed_segments_and_skip_pagination_and_terminal_slugs() {
+        let raw = br#"{
+          "log": {
+            "version": "1.2",
+            "entries": [
+              {
+                "request": { "method": "GET", "url": "https://hn.example.test/v0/item/50538240.json" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://hn.example.test/v0/item/50539499.json" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://poke.example.test/api/v2/pokemon/pikachu" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://poke.example.test/api/v2/pokemon/charizard" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://poke.example.test/api/v2/pokemon/bulbasaur" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://poke.example.test/api/v2/pokemon-species/25/" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              },
+              {
+                "request": { "method": "GET", "url": "https://dummy.example.test/products?limit=5&skip=5" },
+                "response": { "status": 200, "content": { "mimeType": "application/json" } }
+              }
+            ]
+          }
+        }"#;
+        let har = parse_har_bytes(raw, &ImportLimits::default()).expect("parse");
+        let session = normalize_har_session("s1", "real.har", &har);
+        let endpoints = discover_endpoints(&[session]);
+
+        assert!(endpoints
+            .iter()
+            .any(|e| e.path_template == "/v0/item/{item_id}.json"
+                && e.observed_request_ids.len() == 2));
+        assert!(endpoints
+            .iter()
+            .any(|e| e.path_template == "/api/v2/pokemon/{pokemon_id}"
+                && e.observed_request_ids.len() == 3));
+        assert!(endpoints
+            .iter()
+            .any(|e| e.path_template == "/api/v2/pokemon-species/{pokemon_species_id}"));
+        let products = endpoints
+            .iter()
+            .find(|e| e.path_template == "/products")
+            .expect("products");
+        let pag = products.pagination.as_ref().expect("offset_limit");
+        assert_eq!(pag.style, PaginationStyle::OffsetLimit);
+        assert_eq!(pag.query_params, vec!["limit", "skip"]);
     }
 }

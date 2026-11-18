@@ -112,10 +112,36 @@ pub fn is_sensitive_header_name(name: &str) -> bool {
     SENSITIVE_HEADERS.contains(&lower.as_str())
 }
 
+/// Normalizes `camelCase`, `kebab-case`, and `snake_case` key names into canonical lowercase `snake_case`.
+#[must_use]
+pub fn normalize_key_snake(key: &str) -> String {
+    let trimmed = key.trim();
+    let mut out = String::with_capacity(trimmed.len() + 4);
+    let mut prev_lower_or_digit = false;
+    for ch in trimmed.chars() {
+        if ch == '-' || ch == '_' || ch == ' ' {
+            if !out.is_empty() && !out.ends_with('_') {
+                out.push('_');
+            }
+            prev_lower_or_digit = false;
+        } else if ch.is_ascii_uppercase() {
+            if prev_lower_or_digit && !out.is_empty() && !out.ends_with('_') {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+            prev_lower_or_digit = false;
+        } else {
+            out.push(ch.to_ascii_lowercase());
+            prev_lower_or_digit = ch.is_ascii_lowercase() || ch.is_ascii_digit();
+        }
+    }
+    out
+}
+
 /// Returns true if a JSON field, form key, or query parameter name likely holds a secret.
 #[must_use]
 pub fn is_sensitive_key_name(key: &str) -> bool {
-    let normalized = key.trim().to_ascii_lowercase().replace('-', "_");
+    let normalized = normalize_key_snake(key);
     if NON_SECRET_KEY_ALLOWLIST.contains(&normalized.as_str()) {
         return false;
     }
@@ -151,7 +177,10 @@ fn split_auth_scheme(raw: &str) -> Option<(&'static str, &str)> {
         ("basic ", "basic"),
         ("digest ", "digest"),
     ] {
-        if trimmed.len() >= prefix.len() && trimmed[..prefix.len()].eq_ignore_ascii_case(prefix) {
+        if trimmed
+            .get(..prefix.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+        {
             return Some((scheme, trimmed[prefix.len()..].trim()));
         }
     }
@@ -300,7 +329,7 @@ pub fn sanitize_form_urlencoded(raw: &str) -> (String, Vec<(String, String)>, us
             decoded_val
         } else if is_sensitive_key_name(&decoded_key) {
             count += 1;
-            RedactedValue::from_secret(decoded_key.to_ascii_lowercase(), &decoded_val).marker()
+            RedactedValue::from_secret(normalize_key_snake(&decoded_key), &decoded_val).marker()
         } else if let Some(secret_redacted) = sanitize_secret_like_string(&decoded_val) {
             count += 1;
             secret_redacted
@@ -405,7 +434,7 @@ pub fn sanitize_query_param(name: &str, value: &str) -> (String, bool) {
         return (value.to_string(), false);
     }
     if is_sensitive_key_name(name) {
-        let kind = name.trim().to_ascii_lowercase();
+        let kind = normalize_key_snake(name);
         return (RedactedValue::from_secret(kind, value).marker(), true);
     }
     if let Some(redacted) = sanitize_secret_like_string(value) {
@@ -430,7 +459,7 @@ pub fn sanitize_json_value(input: &Value) -> (Value, usize) {
                             .as_str()
                             .map_or_else(|| v.to_string(), ToString::to_string);
                         let marker =
-                            RedactedValue::from_secret(k.to_ascii_lowercase(), &raw).marker();
+                            RedactedValue::from_secret(normalize_key_snake(k), &raw).marker();
                         out.insert(k.clone(), Value::String(marker));
                         count += 1;
                     }
@@ -603,5 +632,34 @@ mod tests {
         assert_eq!(h_kind, "authorization_bearer");
         assert_eq!(j_fp, h_fp);
         assert!(parse_redacted_marker("plain-value").is_none());
+    }
+
+    #[test]
+    fn handles_multibyte_utf8_strings_without_panicking() {
+        let utf8_text = "ほっぺの　りょうがわに\nちいさい　でんきぶくろを　もつ。";
+        assert!(sanitize_secret_like_string(utf8_text).is_none());
+        let (val, count) = sanitize_json_value(&serde_json::json!({ "flavor_text": utf8_text }));
+        assert_eq!(count, 0);
+        assert_eq!(val["flavor_text"], utf8_text);
+    }
+
+    #[test]
+    fn redacts_camelcase_keys_and_preserves_camelcase_pagination_tokens() {
+        let payload = serde_json::json!({
+            "accessToken": "hf_synthetic_opaque_tok",
+            "refreshToken": "hf_synthetic_refresh_tok",
+            "nextPageToken": "cursor_2",
+            "tokenType": "Bearer"
+        });
+        let (clean, count) = sanitize_json_value(&payload);
+        assert_eq!(count, 2);
+        let access_marker = clean["accessToken"].as_str().expect("redacted accessToken");
+        assert!(access_marker.starts_with("[REDACTED:access_token:"));
+        assert!(clean["refreshToken"]
+            .as_str()
+            .expect("redacted refreshToken")
+            .starts_with("[REDACTED:refresh_token:"));
+        assert_eq!(clean["nextPageToken"], "cursor_2");
+        assert_eq!(clean["tokenType"], "Bearer");
     }
 }

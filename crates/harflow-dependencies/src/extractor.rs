@@ -157,7 +157,7 @@ struct EndpointSpec<'a> {
     host: &'a str,
     path_template: &'a str,
     template_segments: Vec<&'a str>,
-    param_positions: Vec<(usize, String)>,
+    param_positions: Vec<(usize, String, String)>,
 }
 
 struct EndpointPathMatcher<'a> {
@@ -180,9 +180,7 @@ impl<'a> EndpointPathMatcher<'a> {
                 .iter()
                 .enumerate()
                 .filter_map(|(pos, seg)| {
-                    seg.strip_prefix('{')
-                        .and_then(|s| s.strip_suffix('}'))
-                        .map(|name| (pos, name.to_string()))
+                    parse_template_param_segment(seg).map(|(n, sfx)| (pos, n, sfx))
                 })
                 .collect();
 
@@ -230,7 +228,7 @@ impl<'a> EndpointPathMatcher<'a> {
                     .template_segments
                     .iter()
                     .zip(path_segs.iter())
-                    .all(|(tpl, raw)| tpl.starts_with('{') || *tpl == *raw)
+                    .all(|(tpl, raw)| tpl.contains('{') || *tpl == *raw)
             {
                 let params = extract_params_from_spec(spec, &path_segs);
                 return (
@@ -247,13 +245,48 @@ impl<'a> EndpointPathMatcher<'a> {
     }
 }
 
+fn parse_template_param_segment(seg: &str) -> Option<(String, String)> {
+    let open = seg.find('{')?;
+    let close = seg.find('}')?;
+    if close <= open + 1 {
+        return None;
+    }
+    let name = seg[open + 1..close].to_string();
+    let suffix = seg.get(close + 1..).unwrap_or("").to_string();
+    Some((name, suffix))
+}
+
+fn strip_format_suffix(seg: &str) -> &str {
+    for sfx in [".json", ".xml"] {
+        if seg.len() > sfx.len() {
+            let stem_len = seg.len() - sfx.len();
+            if let (Some(stem), Some(ext)) = (seg.get(..stem_len), seg.get(stem_len..)) {
+                if ext.eq_ignore_ascii_case(sfx) {
+                    return stem;
+                }
+            }
+        }
+    }
+    seg
+}
+
 fn extract_params_from_spec(spec: &EndpointSpec<'_>, path_segs: &[&str]) -> Vec<(String, String)> {
     spec.param_positions
         .iter()
-        .filter_map(|(pos, name)| {
-            path_segs
-                .get(*pos)
-                .map(|raw| (name.clone(), (*raw).to_string()))
+        .filter_map(|(pos, name, suffix)| {
+            path_segs.get(*pos).map(|raw| {
+                let clean = if !suffix.is_empty()
+                    && raw.len() > suffix.len()
+                    && raw
+                        .get(raw.len() - suffix.len()..)
+                        .is_some_and(|t| t.eq_ignore_ascii_case(suffix))
+                {
+                    &raw[..raw.len() - suffix.len()]
+                } else {
+                    *raw
+                };
+                (name.clone(), clean.to_string())
+            })
         })
         .collect()
 }
@@ -261,12 +294,13 @@ fn extract_params_from_spec(spec: &EndpointSpec<'_>, path_segs: &[&str]) -> Vec<
 fn extract_fallback_path_params(path_segs: &[&str]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for (pos, seg) in path_segs.iter().enumerate() {
-        if looks_like_dynamic_segment(pos, path_segs.get(pos.saturating_sub(1)).copied(), seg) {
+        let stem = strip_format_suffix(seg);
+        if looks_like_dynamic_segment(pos, path_segs.get(pos.saturating_sub(1)).copied(), stem) {
             let name = path_segs
                 .get(pos.saturating_sub(1))
                 .filter(|_| pos > 0)
                 .map_or_else(|| "id".to_string(), |prev| singularize_param(prev));
-            out.push((name, (*seg).to_string()));
+            out.push((name, stem.to_string()));
         }
     }
     out
@@ -547,18 +581,53 @@ fn extract_json_scalars(
             if trimmed.is_empty() || trimmed.len() > MAX_SCALAR_VALUE_LEN {
                 return;
             }
+            let norm_lower = norm_path.to_ascii_lowercase();
             push_candidate(
                 out,
                 entry,
                 timeline_pos,
                 endpoint_id,
                 endpoint_key,
-                location,
+                location.clone(),
                 concrete_path.to_string(),
-                norm_path.to_ascii_lowercase(),
+                norm_lower.clone(),
                 trimmed.to_string(),
                 false,
             );
+            if location == ValueLocation::ResponseBody
+                && (trimmed.starts_with("http://") || trimmed.starts_with("https://"))
+            {
+                if let Some(trailing) = trailing_url_segment(trimmed) {
+                    let clean_seg = strip_format_suffix(&trailing);
+                    let seg_lower = clean_seg.to_ascii_lowercase();
+                    let is_asset = seg_lower.ends_with(".html")
+                        || seg_lower.ends_with(".css")
+                        || seg_lower.ends_with(".js")
+                        || seg_lower.ends_with(".png")
+                        || seg_lower.ends_with(".svg");
+                    let is_generic =
+                        matches!(seg_lower.as_str(), "api" | "v0" | "v1" | "v2" | "v3");
+                    if !is_asset
+                        && !is_generic
+                        && (clean_seg.bytes().any(|b| b.is_ascii_digit())
+                            || is_uuid_like(clean_seg)
+                            || clean_seg.len() >= 4)
+                    {
+                        push_candidate(
+                            out,
+                            entry,
+                            timeline_pos,
+                            endpoint_id,
+                            endpoint_key,
+                            location,
+                            concrete_path.to_string(),
+                            format!("{norm_lower}#segment"),
+                            clean_seg.to_string(),
+                            true,
+                        );
+                    }
+                }
+            }
         }
         Value::Number(n) => {
             push_candidate_with_hint(
@@ -686,9 +755,13 @@ fn is_uuid_like(val: &str) -> bool {
 fn trailing_url_segment(raw: &str) -> Option<String> {
     let no_query = raw.trim().split(['?', '#']).next()?;
     let trimmed = no_query.trim_end_matches('/');
-    let (_, seg) = trimmed.rsplit_once('/')?;
+    let after_scheme = trimmed.split_once("://").map_or(trimmed, |(_, rest)| rest);
+    if !after_scheme.contains('/') {
+        return None;
+    }
+    let (_, seg) = after_scheme.rsplit_once('/')?;
     let clean = seg.trim();
-    if clean.len() < 2 || clean == trimmed {
+    if clean.is_empty() || clean == after_scheme {
         return None;
     }
     Some(clean.to_string())
@@ -810,5 +883,54 @@ mod tests {
             .consumers
             .iter()
             .any(|c| c.location == ValueLocation::Body && c.path_or_key == "grant_type"));
+    }
+
+    #[test]
+    fn extracts_format_suffixed_path_params_and_hypermedia_url_segments() {
+        let raw = br#"{
+          "log": {
+            "version": "1.2",
+            "entries": [
+              {
+                "startedDateTime": "2026-11-18T02:00:00Z",
+                "time": 10.0,
+                "request": { "method": "GET", "url": "https://hn.example.test/v0/topstories.json" },
+                "response": { "status": 200, "content": { "mimeType": "application/json", "text": "[50538240, 50539499]" } }
+              },
+              {
+                "startedDateTime": "2026-11-18T02:00:01Z",
+                "time": 10.0,
+                "request": { "method": "GET", "url": "https://hn.example.test/v0/item/50538240.json" },
+                "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"id\":50538240}" } }
+              },
+              {
+                "startedDateTime": "2026-11-18T02:00:02Z",
+                "time": 10.0,
+                "request": { "method": "GET", "url": "https://hn.example.test/v0/item/50539499.json" },
+                "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"id\":50539499,\"evolution_chain\":{\"url\":\"https://poke.example.test/api/v2/evolution-chain/10/\"}}" } }
+              },
+              {
+                "startedDateTime": "2026-11-18T02:00:03Z",
+                "time": 10.0,
+                "request": { "method": "GET", "url": "https://poke.example.test/api/v2/evolution-chain/10/" },
+                "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"id\":10}" } }
+              }
+            ]
+          }
+        }"#;
+        let har = parse_har_bytes(raw, &ImportLimits::default()).expect("parse");
+        let session = normalize_har_session("sess-0001", "real.har", &har);
+        let endpoints = discover_endpoints(std::slice::from_ref(&session));
+        let deps = crate::detect_dependencies(std::slice::from_ref(&session), &endpoints);
+
+        assert!(deps
+            .iter()
+            .any(|d| d.target.location == ValueLocation::Path
+                && d.target.json_path_or_key == "item_id"));
+        assert!(deps
+            .iter()
+            .any(|d| d.source.json_path_or_key == "$.evolution_chain.url"
+                && d.target.location == ValueLocation::Path
+                && d.target.json_path_or_key == "evolution_chain_id"));
     }
 }

@@ -1364,7 +1364,11 @@ fn rule_id_for(dep_type: &DependencyType, trans: &Transformation) -> String {
 fn strip_auth_or_token_prefix(raw: &str) -> Option<&str> {
     let trimmed = raw.trim();
     for prefix in ["bearer ", "token ", "apikey ", "api-key "] {
-        if trimmed.len() > prefix.len() && trimmed[..prefix.len()].eq_ignore_ascii_case(prefix) {
+        if trimmed.len() > prefix.len()
+            && trimmed
+                .get(..prefix.len())
+                .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+        {
             return Some(trimmed[prefix.len()..].trim());
         }
     }

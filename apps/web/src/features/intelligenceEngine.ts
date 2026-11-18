@@ -30,7 +30,7 @@ import type {
   Transformation,
   VariabilityKind,
 } from '@harflow/shared-types';
-import { parseRedactedMarker } from './harImport.js';
+import { parseRedactedMarker, splitFormatSuffix } from './harImport.js';
 
 export const DEFAULT_CLEANER_CONFIG: CleanerConfig = {
   keepCategories: ['api', 'authentication'],
@@ -496,10 +496,14 @@ function detectPagination(
     return { style: 'page_number', queryParams: qp, responseNextField: null };
   }
 
-  if (lowerQuery.includes('offset') && lowerQuery.includes('limit')) {
+  if (
+    lowerQuery.includes('limit') &&
+    (lowerQuery.includes('offset') || lowerQuery.includes('skip'))
+  ) {
+    const qp = ['offset', 'skip', 'limit'].filter((k) => lowerQuery.includes(k));
     return {
       style: 'offset_limit',
-      queryParams: ['offset', 'limit'],
+      queryParams: qp,
       responseNextField: null,
     };
   }
@@ -507,10 +511,119 @@ function detectPagination(
   return null;
 }
 
+const TERMINAL_STATIC_GUARD = new Set([
+  'api',
+  'me',
+  'self',
+  'list',
+  'create',
+  'update',
+  'delete',
+  'search',
+  'export',
+  'status',
+  'health',
+  'metrics',
+  'settings',
+  'profile',
+  'summary',
+  'users',
+  'orders',
+  'products',
+  'items',
+  'carts',
+  'posts',
+  'comments',
+  'tokens',
+  'sessions',
+  'events',
+  'logs',
+  'accounts',
+  'roles',
+  'permissions',
+  'files',
+  'images',
+  'docs',
+  'login',
+  'logout',
+  'refresh',
+  'register',
+  'signin',
+  'signup',
+  'token',
+  'topstories',
+  'newstories',
+  'beststories',
+  'updates',
+]);
+
+function singularizeCamelParam(prev: string): string {
+  const clean = prev.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (!clean || /^v\d+$/i.test(clean) || clean === 'api') {
+    return 'id';
+  }
+  let singular = clean;
+  if (clean.endsWith('species') || clean.endsWith('series')) {
+    singular = clean;
+  } else if (clean.endsWith('ies') && clean.length > 4) {
+    singular = `${clean.slice(0, -3)}y`;
+  } else if (clean.endsWith('sses') || clean.endsWith('xes') || clean.endsWith('ches')) {
+    singular = clean.slice(0, -2);
+  } else if (clean.length > 2 && clean.endsWith('s') && !clean.endsWith('ss')) {
+    singular = clean.slice(0, -1);
+  }
+  const camel = singular.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
+  return `${camel}Id`;
+}
+
+function detectTerminalSlugTemplates(
+  keptEntries: TrafficEntrySummary[],
+): Map<string, string> {
+  const buckets = new Map<string, Set<string>>();
+  for (const entry of keptEntries) {
+    const segs = (entry.rawPath ?? entry.endpoint).split('/').filter(Boolean);
+    if (segs.length < 2) continue;
+    const parent = segs[segs.length - 2]!;
+    const parentLower = parent.toLowerCase();
+    if (
+      parentLower === 'api' ||
+      /^v\d+$/i.test(parentLower) ||
+      ['auth', 'oauth', 'oauth2', 'sso', 'saml', 'admin'].includes(parentLower)
+    ) {
+      continue;
+    }
+    const { stem, suffix } = splitFormatSuffix(segs[segs.length - 1]!);
+    const prefix = segs.slice(0, -1).join('/');
+    const key = `${entry.method}::${entry.domain}::${segs.length}::${prefix}::${suffix}`;
+    const set = buckets.get(key) ?? new Set<string>();
+    set.add(stem);
+    buckets.set(key, set);
+  }
+
+  const promoted = new Map<string, string>();
+  for (const [key, stems] of buckets.entries()) {
+    if (stems.size < 3) continue;
+    const allDynamicSlugs = Array.from(stems).every(
+      (st) => !/^v\d+$/i.test(st) && !TERMINAL_STATIC_GUARD.has(st.toLowerCase()),
+    );
+    if (!allDynamicSlugs) continue;
+    const [method, host, , prefix, suffix] = key.split('::');
+    const prefixSegs = (prefix ?? '').split('/').filter(Boolean);
+    const parent = prefixSegs[prefixSegs.length - 1] ?? '';
+    const paramName = singularizeCamelParam(parent);
+    promoted.set(
+      `${method}::${host}::${prefix}::${suffix}`,
+      `/${prefixSegs.join('/')}/{${paramName}}${suffix ?? ''}`,
+    );
+  }
+  return promoted;
+}
+
 export function discoverEndpointsAndSchemas(
   keptEntries: TrafficEntrySummary[],
   endpointOverrides: Record<string, string> = {},
 ): { endpoints: Endpoint[]; schemas: SchemaDefinition[] } {
+  const terminalPromotions = detectTerminalSlugTemplates(keptEntries);
   const groups = new Map<
     string,
     {
@@ -522,8 +635,18 @@ export function discoverEndpointsAndSchemas(
   >();
 
   for (const entry of keptEntries) {
-    const baseKey = `${entry.method}::${entry.domain}::${entry.endpoint}`;
-    const overriddenTemplate = endpointOverrides[baseKey] ?? entry.endpoint;
+    const segs = (entry.rawPath ?? entry.endpoint).split('/').filter(Boolean);
+    let inferredEndpoint = entry.endpoint;
+    if (segs.length >= 2) {
+      const { suffix } = splitFormatSuffix(segs[segs.length - 1]!);
+      const promoKey = `${entry.method}::${entry.domain}::${segs.slice(0, -1).join('/')}::${suffix}`;
+      const promoted = terminalPromotions.get(promoKey);
+      if (promoted) {
+        inferredEndpoint = promoted;
+      }
+    }
+    const baseKey = `${entry.method}::${entry.domain}::${inferredEndpoint}`;
+    const overriddenTemplate = endpointOverrides[baseKey] ?? inferredEndpoint;
     const groupKey = `${entry.method}::${entry.domain}::${overriddenTemplate}`;
     const existing = groups.get(groupKey);
     if (existing) {
@@ -733,14 +856,40 @@ function buildMatchKeys(raw: string): { keys: string[]; isRedactedFp: boolean } 
   return { keys, isRedactedFp: false };
 }
 
+function extractTrailingUrlSegment(raw: string): string | null {
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    return null;
+  }
+  const noQuery = raw.trim().split(/[?#]/)[0] ?? '';
+  const trimmed = noQuery.replace(/\/+$/, '');
+  const schemeIdx = trimmed.indexOf('://');
+  const afterScheme = schemeIdx >= 0 ? trimmed.slice(schemeIdx + 3) : trimmed;
+  if (!afterScheme.includes('/')) {
+    return null;
+  }
+  const seg = afterScheme.slice(afterScheme.lastIndexOf('/') + 1).trim();
+  const { stem } = splitFormatSuffix(seg);
+  if (!stem || /^(api|v\d+)$/i.test(stem) || /\.(html?|css|js|png|svg|jpe?g|webp|ico)$/i.test(seg)) {
+    return null;
+  }
+  if (/^\d+$/.test(stem) && stem.length >= 2) {
+    return stem;
+  }
+  if (stem.length >= 4 && !WEAK_SCALAR_VALUES.has(stem.toLowerCase())) {
+    return stem;
+  }
+  return null;
+}
+
 function classifyDependencyType(
   sourceLoc: Dependency['source']['location'],
   targetLoc: Dependency['target']['location'],
   sourcePath: string,
   targetPath: string,
 ): DependencyType {
+  const srcLower = sourcePath.toLowerCase();
   if (
-    sourcePath.toLowerCase().includes('cursor') ||
+    srcLower.includes('cursor') ||
     targetPath.toLowerCase().includes('cursor')
   ) {
     return 'pagination_chain';
@@ -749,8 +898,10 @@ function classifyDependencyType(
     return 'set_cookie_to_cookie';
   }
   if (
-    sourcePath.toLowerCase().includes('access_token') ||
-    sourcePath.toLowerCase().includes('refresh_token') ||
+    srcLower.includes('access_token') ||
+    srcLower.includes('accesstoken') ||
+    srcLower.includes('refresh_token') ||
+    srcLower.includes('refreshtoken') ||
     targetPath.toLowerCase() === 'authorization'
   ) {
     return targetLoc === 'header' ? 'response_to_header' : 'session_chain';
@@ -773,7 +924,14 @@ export function detectClientDependencies(
   keptEntries: TrafficEntrySummary[],
   userOverrides: Record<string, ConfirmationStatus> = {},
   dependencyEdits: Record<string, DependencyMappingOverride> = {},
+  endpoints: Endpoint[] = [],
 ): Dependency[] {
+  const epTemplateByReqId = new Map<string, string>();
+  for (const ep of endpoints) {
+    for (const reqId of ep.observedRequestIds) {
+      epTemplateByReqId.set(reqId, ep.pathTemplate);
+    }
+  }
   const bySession = new Map<string, TrafficEntrySummary[]>();
   for (const e of keptEntries) {
     const list = bySession.get(e.sessionId);
@@ -858,22 +1016,32 @@ export function detectClientDependencies(
       }
 
       const rawSegs = (entry.rawPath ?? '').split('/').filter(Boolean);
-      const tplSegs = entry.endpoint.split('/').filter(Boolean);
+      const effectiveEndpoint = epTemplateByReqId.get(entry.id) ?? entry.endpoint;
+      const tplSegs = effectiveEndpoint.split('/').filter(Boolean);
       for (let sIdx = 0; sIdx < Math.min(rawSegs.length, tplSegs.length); sIdx += 1) {
         const seg = rawSegs[sIdx]!;
         const tpl = tplSegs[sIdx]!;
-        if (tpl.startsWith('{') && tpl.endsWith('}') && isStrongValue(seg, tpl)) {
-          const { keys, isRedactedFp } = buildMatchKeys(seg);
-          consumers.push({
-            sessionId,
-            requestId: entry.id,
-            orderIndex: idx,
-            location: 'path',
-            jsonPathOrKey: tpl.slice(1, -1),
-            rawValue: seg,
-            matchKeys: keys,
-            isRedactedFp,
-          });
+        const tplMatch = /^\{([^}]+)\}(.*)$/.exec(tpl);
+        if (tplMatch) {
+          const paramName = tplMatch[1]!;
+          const sfx = tplMatch[2] ?? '';
+          const cleanSeg =
+            sfx && seg.toLowerCase().endsWith(sfx.toLowerCase())
+              ? seg.slice(0, seg.length - sfx.length)
+              : seg;
+          if (isStrongValue(cleanSeg, paramName) || (/^\d+$/.test(cleanSeg) && cleanSeg.length >= 2)) {
+            const { keys, isRedactedFp } = buildMatchKeys(cleanSeg);
+            consumers.push({
+              sessionId,
+              requestId: entry.id,
+              orderIndex: idx,
+              location: 'path',
+              jsonPathOrKey: paramName,
+              rawValue: cleanSeg,
+              matchKeys: keys,
+              isRedactedFp,
+            });
+          }
         }
       }
 
@@ -1018,6 +1186,19 @@ export function detectClientDependencies(
                 rawValue: leaf.value,
                 matchKeys: keys,
                 isRedactedFp,
+              });
+            }
+            const urlSeg = extractTrailingUrlSegment(leaf.value);
+            if (urlSeg) {
+              producers.push({
+                sessionId,
+                requestId: entry.id,
+                orderIndex: idx,
+                location: 'response_body',
+                jsonPathOrKey: leaf.path,
+                rawValue: urlSeg,
+                matchKeys: [`raw:${urlSeg}`],
+                isRedactedFp: false,
               });
             }
           }
@@ -1181,8 +1362,13 @@ export function analyzeSessions(
     const isOauth =
       pathLower.includes('/oauth') ||
       pathLower.endsWith('/token') ||
+      ((pathLower.includes('/auth/login') || pathLower.includes('/auth/refresh')) &&
+        ((entry.responseBody?.includes('accessToken') ?? false) ||
+          (entry.responseBody?.includes('access_token') ?? false))) ||
       (entry.requestBody?.includes('grant_type') ?? false) ||
-      (entry.responseBody?.includes('access_token') ?? false);
+      (entry.requestBody?.includes('grantType') ?? false) ||
+      (entry.responseBody?.includes('access_token') ?? false) ||
+      (entry.responseBody?.includes('accessToken') ?? false);
     const hasCustomSig = entry.sanitizedHeaders.some((h) =>
       h.name.toLowerCase().includes('signature'),
     );

@@ -471,6 +471,7 @@ function runFullAnalysis(
     keptEntries,
     userOverrides,
     dependencyEdits,
+    endpoints,
   );
   const { authFlows, lifecycle, comparison } = analyzeSessions(
     sources,

@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Real-world multi-site verification fixes (`DummyJSON`, `Hacker News`, `PokéAPI`):
+  - `BUG-002`: Replaced unguarded UTF-8 `&str` byte-index slicing in `harflow-security::split_auth_scheme` and `harflow-dependencies::strip_auth_or_token_prefix` with char-boundary-safe `.get(..prefix.len())`.
+  - `BUG-003`: Added `.json`/`.xml` format-suffix preservation and parameter extraction across `harflow-endpoints`, `harflow-dependencies`, and `apps/web`.
+  - `BUG-004`: Added camelCase credential/OAuth key normalization (`accessToken`, `refreshToken`, etc.) in `harflow-security`, `harflow-sessions`, and `apps/web`, plus `skip` parameter recognition for `offset_limit` pagination.
+  - `BUG-005`: Added guarded terminal resource slug clustering (`/api/v2/pokemon/{pokemon_id}`), `species`/`series` singularization preservation, and hypermedia `http(s)://` JSON URL trailing-segment extraction.
+
 ### Added
 
 - Phase 4 (Professional UI):

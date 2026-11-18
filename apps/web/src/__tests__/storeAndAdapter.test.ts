@@ -123,4 +123,147 @@ describe('Phase 4 Store, Undo/Redo & InMemoryApplicationAdapter Parity', () => {
       result.current.state.model?.endpoints.find((e) => e.id === 'ep-0003')?.pathTemplate,
     ).toBe('/v1/orders/{orderId}');
   });
+
+  it('handles camelCase auth keys, format-suffixed paths, terminal slugs, skip pagination, and hypermedia URLs', async () => {
+    const adapter = new InMemoryApplicationAdapter();
+    await adapter.invoke('project.create', { name: 'Real Parity' });
+    const har = JSON.stringify({
+      log: {
+        version: '1.2',
+        entries: [
+          {
+            time: 10,
+            request: {
+              method: 'POST',
+              url: 'https://api.real.test/auth/login',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              queryString: [],
+              postData: {
+                mimeType: 'application/json',
+                text: JSON.stringify({ username: 'demo', password: 'hf_synthetic_login_pw' }),
+              },
+            },
+            response: {
+              status: 200,
+              content: {
+                mimeType: 'application/json',
+                text: JSON.stringify({
+                  accessToken: 'hf_synthetic_opaque_access_1',
+                  refreshToken: 'hf_synthetic_opaque_refresh_1',
+                }),
+              },
+            },
+          },
+          {
+            time: 10,
+            request: {
+              method: 'GET',
+              url: 'https://api.real.test/products?limit=5&skip=5',
+              headers: [{ name: 'Authorization', value: 'Bearer hf_synthetic_opaque_access_1' }],
+              queryString: [
+                { name: 'limit', value: '5' },
+                { name: 'skip', value: '5' },
+              ],
+            },
+            response: {
+              status: 200,
+              content: {
+                mimeType: 'application/json',
+                text: JSON.stringify({
+                  items: [50538240],
+                  evolution_chain: { url: 'https://api.real.test/api/v2/evolution-chain/10/' },
+                }),
+              },
+            },
+          },
+          {
+            time: 10,
+            request: {
+              method: 'GET',
+              url: 'https://api.real.test/v0/item/50538240.json',
+              headers: [],
+              queryString: [],
+            },
+            response: {
+              status: 200,
+              content: { mimeType: 'application/json', text: '{"id":50538240}' },
+            },
+          },
+          {
+            time: 10,
+            request: {
+              method: 'GET',
+              url: 'https://api.real.test/api/v2/evolution-chain/10/',
+              headers: [],
+              queryString: [],
+            },
+            response: {
+              status: 200,
+              content: { mimeType: 'application/json', text: '{"id":10}' },
+            },
+          },
+          {
+            time: 10,
+            request: { method: 'GET', url: 'https://api.real.test/api/v2/pokemon/pikachu', headers: [], queryString: [] },
+            response: { status: 200, content: { mimeType: 'application/json', text: '{"name":"pikachu"}' } },
+          },
+          {
+            time: 10,
+            request: { method: 'GET', url: 'https://api.real.test/api/v2/pokemon/charizard', headers: [], queryString: [] },
+            response: { status: 200, content: { mimeType: 'application/json', text: '{"name":"charizard"}' } },
+          },
+          {
+            time: 10,
+            request: { method: 'GET', url: 'https://api.real.test/api/v2/pokemon/bulbasaur', headers: [], queryString: [] },
+            response: { status: 200, content: { mimeType: 'application/json', text: '{"name":"bulbasaur"}' } },
+          },
+        ],
+      },
+    });
+
+    const imported = await adapter.invoke('har.import', {
+      projectId: 'proj-demo-0001',
+      sourceName: 'real.har',
+      rawText: har,
+    });
+    const analysis = await adapter.invoke('analysis.results', {
+      projectId: imported.manifest.id,
+    });
+
+    const serialized = JSON.stringify(analysis);
+    expect(serialized).not.toContain('hf_synthetic_opaque_access_1');
+    expect(serialized).not.toContain('hf_synthetic_opaque_refresh_1');
+    expect(serialized).not.toContain('hf_synthetic_login_pw');
+
+    expect(
+      analysis.model.endpoints.some((e) => e.pathTemplate === '/v0/item/{itemId}.json'),
+    ).toBe(true);
+    expect(
+      analysis.model.endpoints.some((e) => e.pathTemplate === '/api/v2/pokemon/{pokemonId}'),
+    ).toBe(true);
+    expect(
+      analysis.model.endpoints.find((e) => e.pathTemplate === '/products')?.pagination?.style,
+    ).toBe('offset_limit');
+    expect(
+      analysis.model.dependencies.some(
+        (d) =>
+          d.source.jsonPathOrKey === '$.accessToken' &&
+          d.target.jsonPathOrKey === 'Authorization',
+      ),
+    ).toBe(true);
+    expect(
+      analysis.model.dependencies.some(
+        (d) =>
+          d.source.jsonPathOrKey === '$.items[0]' &&
+          d.target.jsonPathOrKey === 'itemId',
+      ),
+    ).toBe(true);
+    expect(
+      analysis.model.dependencies.some(
+        (d) =>
+          d.source.jsonPathOrKey === '$.evolution_chain.url' &&
+          d.target.jsonPathOrKey === 'evolutionChainId',
+      ),
+    ).toBe(true);
+  });
 });

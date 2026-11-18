@@ -289,13 +289,25 @@ pub fn analyze_session_lifecycle(
                 }
             }
             if let Some(json) = &entry.response_body_json {
-                for field in ["access_token", "refresh_token"] {
+                for field in [
+                    "access_token",
+                    "accessToken",
+                    "refresh_token",
+                    "refreshToken",
+                ] {
                     if let Some(val) = json.get(field).and_then(Value::as_str) {
                         if let Some((kind, fp)) = parse_redacted_marker(val) {
+                            let canonical_kind = if field.to_ascii_lowercase().contains("refresh") {
+                                "refresh_token"
+                            } else if field.to_ascii_lowercase().contains("access") {
+                                "access_token"
+                            } else {
+                                kind
+                            };
                             record_fingerprint_transition(
                                 &session.session_id,
                                 &entry.id,
-                                kind,
+                                canonical_kind,
                                 fp,
                                 &mut last_fp_by_kind,
                                 &mut token_rotations,
@@ -729,25 +741,30 @@ fn entry_is_oauth_like(entry: &NormalizedEntry) -> bool {
     let lower_path = entry.path.to_ascii_lowercase();
     let token_path = lower_path.contains("/oauth/")
         || lower_path.ends_with("/token")
-        || lower_path.contains("/auth/token");
-    let has_grant_type = entry
-        .request_form_params
-        .iter()
-        .any(|(k, _)| k.eq_ignore_ascii_case("grant_type"))
-        || entry
+        || lower_path.contains("/auth/token")
+        || lower_path.contains("/auth/login")
+        || lower_path.contains("/auth/refresh");
+    let has_grant_type =
+        entry.request_form_params.iter().any(|(k, _)| {
+            k.eq_ignore_ascii_case("grant_type") || k.eq_ignore_ascii_case("grantType")
+        }) || entry
             .request_body_json
             .as_ref()
             .and_then(Value::as_object)
-            .is_some_and(|m| m.contains_key("grant_type"));
+            .is_some_and(|m| m.contains_key("grant_type") || m.contains_key("grantType"));
     let has_oauth_response = entry
         .response_body_json
         .as_ref()
         .and_then(Value::as_object)
         .is_some_and(|m| {
-            m.contains_key("access_token")
-                && (m.contains_key("token_type")
-                    || m.contains_key("refresh_token")
-                    || m.contains_key("expires_in"))
+            let has_access = m.contains_key("access_token") || m.contains_key("accessToken");
+            let has_meta = m.contains_key("token_type")
+                || m.contains_key("tokenType")
+                || m.contains_key("refresh_token")
+                || m.contains_key("refreshToken")
+                || m.contains_key("expires_in")
+                || m.contains_key("expiresIn");
+            has_access && has_meta
         });
 
     (token_path && (has_grant_type || has_oauth_response)) || (has_grant_type && has_oauth_response)
@@ -777,7 +794,9 @@ fn is_login_request(entry: &NormalizedEntry) -> bool {
             .and_then(Value::as_object)
             .is_some_and(|m| {
                 m.contains_key("access_token")
+                    || m.contains_key("accessToken")
                     || m.contains_key("session_token")
+                    || m.contains_key("sessionToken")
                     || m.contains_key("token")
             });
     login_path && (produces_auth || entry.method == "POST")
@@ -789,7 +808,8 @@ fn is_refresh_request(entry: &NormalizedEntry) -> bool {
         return true;
     }
     let form_refresh = entry.request_form_params.iter().any(|(k, v)| {
-        k.eq_ignore_ascii_case("grant_type") && v.eq_ignore_ascii_case("refresh_token")
+        (k.eq_ignore_ascii_case("grant_type") || k.eq_ignore_ascii_case("grantType"))
+            && v.eq_ignore_ascii_case("refresh_token")
     });
     let json_refresh = entry
         .request_body_json
@@ -797,15 +817,20 @@ fn is_refresh_request(entry: &NormalizedEntry) -> bool {
         .and_then(Value::as_object)
         .is_some_and(|m| {
             m.get("grant_type")
+                .or_else(|| m.get("grantType"))
                 .and_then(Value::as_str)
                 .is_some_and(|v| v.eq_ignore_ascii_case("refresh_token"))
                 || m.contains_key("refresh_token")
+                || m.contains_key("refreshToken")
         });
     form_refresh || json_refresh
 }
 
 fn extract_expires_in(val: Option<&Value>) -> Option<i64> {
-    val?.as_object()?.get("expires_in")?.as_i64()
+    let obj = val?.as_object()?;
+    obj.get("expires_in")
+        .or_else(|| obj.get("expiresIn"))
+        .and_then(Value::as_i64)
 }
 
 #[cfg(test)]
@@ -1036,5 +1061,55 @@ mod tests {
                     .as_ref()
                     .is_some_and(|rd| rd.added_fields.contains(&"extraDrift".to_string()))
         }));
+    }
+
+    #[test]
+    fn detects_camelcase_oauth_tokens_and_refresh_flow() {
+        let raw = br#"{
+          "log": {
+            "version": "1.2",
+            "entries": [
+              {
+                "startedDateTime": "2026-11-18T00:00:00Z",
+                "time": 10.0,
+                "request": {
+                  "method": "POST",
+                  "url": "https://dummy.example.test/auth/login",
+                  "postData": { "mimeType": "application/json", "text": "{\"username\":\"alice\",\"password\":\"hf_synthetic_pw\"}" }
+                },
+                "response": {
+                  "status": 200,
+                  "content": { "mimeType": "application/json", "text": "{\"accessToken\":\"hf_synthetic_at_1\",\"refreshToken\":\"hf_synthetic_rt_1\"}" }
+                }
+              },
+              {
+                "startedDateTime": "2026-11-18T00:00:01Z",
+                "time": 10.0,
+                "request": {
+                  "method": "POST",
+                  "url": "https://dummy.example.test/auth/refresh",
+                  "postData": { "mimeType": "application/json", "text": "{\"refreshToken\":\"hf_synthetic_rt_1\"}" }
+                },
+                "response": {
+                  "status": 200,
+                  "content": { "mimeType": "application/json", "text": "{\"accessToken\":\"hf_synthetic_at_2\",\"refreshToken\":\"hf_synthetic_rt_2\"}" }
+                }
+              }
+            ]
+          }
+        }"#;
+
+        let har = parse_har_bytes(raw, &ImportLimits::default()).expect("parse");
+        let s = normalize_har_session("sess-1", "dummy.har", &har);
+        let endpoints = discover_endpoints(std::slice::from_ref(&s));
+        let deps = detect_dependencies(std::slice::from_ref(&s), &endpoints);
+        let lifecycle = analyze_session_lifecycle(std::slice::from_ref(&s), &deps);
+
+        assert!(lifecycle
+            .auth_flows
+            .iter()
+            .any(|f| f.scheme == AuthScheme::OauthLike));
+        assert!(lifecycle.auto_refresh_eligible);
+        assert!(!lifecycle.token_rotations.is_empty());
     }
 }

@@ -26,7 +26,7 @@
 - **Rust Core & Intelligence Baseline**:
   - Primary (`29` edges) & Holdout (`10` edges) dependency evaluation: `confirmedPrecision = 1.0`, `directRecall = 1.0`, `f1 = 1.0`, `unEvidencedConfirmed = 0`.
   - 1,000 requests pipeline: `p50 = 169.67 ms`, `p95 = 198.45 ms` (`< 1,000 ms`); 10,000 requests pipeline: `p50 = 1,650.61 ms`, `p95 = 2,309.88 ms` (`< 5,000 ms`).
-- **Verification Status**: `54/54` Rust workspace tests (`cargo test --workspace` including `repo_secret_scan`) and `18/18` Vitest tests (`11` test files across `shared-types`, `desktop`, `ui`, `web`), `eslint .`, `tsc`, and `vite build` (`375.43 kB` JS / `3.89 kB` CSS) all passing.
+- **Verification Status**: `58/58` Rust workspace tests (`cargo test --workspace` including `repo_secret_scan` and `precision_recall_eval`) and `19/19` Vitest tests (`11` test files across `shared-types`, `desktop`, `ui`, `web`), `eslint .`, `tsc`, and `vite build` (`375.43 kB` JS / `3.89 kB` CSS) all passing. Real-world HAR testing verified across `DummyJSON`, `Hacker News`, and `PokéAPI` (`BUG-002`..`BUG-005` fixed and verified).
 
 ## Open Risks & Limitations
 

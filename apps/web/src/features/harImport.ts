@@ -21,6 +21,18 @@ const SENSITIVE_HEADERS = new Set([
   'x-xsrf-token',
 ]);
 
+const NON_SECRET_KEYS = new Set([
+  'token_type',
+  'page_token',
+  'next_page_token',
+  'prev_page_token',
+  'sync_token',
+  'continuation_token',
+  'grant_type',
+  'expires_in',
+  'scope',
+]);
+
 const SENSITIVE_KEYS = new Set([
   'password',
   'passwd',
@@ -34,11 +46,43 @@ const SENSITIVE_KEYS = new Set([
   'private_key',
   'session_token',
   'csrf_token',
+  'auth_token',
+  'bearer_token',
   'token',
   'jwt',
   'session_id',
   'sid',
 ]);
+
+const SENSITIVE_KEY_SUFFIXES = [
+  '_token',
+  '_secret',
+  '_password',
+  '_passwd',
+  '_api_key',
+  '_apikey',
+  '_private_key',
+  '_session_id',
+];
+
+export function normalizeKeySnake(key: string): string {
+  return key
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase();
+}
+
+export function isSensitiveKeyName(key: string): boolean {
+  const normalized = normalizeKeySnake(key);
+  if (NON_SECRET_KEYS.has(normalized)) {
+    return false;
+  }
+  if (SENSITIVE_KEYS.has(normalized)) {
+    return true;
+  }
+  return SENSITIVE_KEY_SUFFIXES.some((sfx) => normalized.endsWith(sfx));
+}
 
 export function fnvFingerprint(raw: string): string {
   let hash = 0x811c9dc5;
@@ -120,10 +164,19 @@ function redactQuery(
   name: string,
   value: string,
 ): { value: string; redacted: boolean } {
-  const lower = name.trim().toLowerCase();
-  if (SENSITIVE_KEYS.has(lower) || looksLikeJwt(value)) {
+  if (parseRedactedMarker(value)) {
+    return { value, redacted: false };
+  }
+  if (isSensitiveKeyName(name)) {
+    const kind = normalizeKeySnake(name) || 'query';
     return {
-      value: `[REDACTED:${lower || 'query'}:${fnvFingerprint(value.trim())}]`,
+      value: `[REDACTED:${kind}:${fnvFingerprint(value.trim())}]`,
+      redacted: true,
+    };
+  }
+  if (looksLikeJwt(value)) {
+    return {
+      value: `[REDACTED:jwt:${fnvFingerprint(value.trim())}]`,
       redacted: true,
     };
   }
@@ -140,22 +193,26 @@ function sanitizeJsonValue(
       sanitizeJsonValue(item, `${path}[${idx}]`, redactedFields),
     );
   }
+  if (typeof value === 'string') {
+    if (!parseRedactedMarker(value) && looksLikeJwt(value)) {
+      redactedFields.push(`body.${path}`);
+      return `[REDACTED:jwt:${fnvFingerprint(value.trim())}]`;
+    }
+    return value;
+  }
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [key, rawChild] of Object.entries(value as Record<string, unknown>)) {
       const childPath = path ? `${path}.${key}` : key;
-      const lowerKey = key.trim().toLowerCase();
       if (
-        SENSITIVE_KEYS.has(lowerKey) &&
+        isSensitiveKeyName(key) &&
         typeof rawChild === 'string' &&
         rawChild.length > 0 &&
         !parseRedactedMarker(rawChild)
       ) {
+        const kind = normalizeKeySnake(key);
         redactedFields.push(`body.${childPath}`);
-        out[key] = `[REDACTED:${lowerKey}:${fnvFingerprint(rawChild.trim())}]`;
-      } else if (typeof rawChild === 'string' && looksLikeJwt(rawChild)) {
-        redactedFields.push(`body.${childPath}`);
-        out[key] = `[REDACTED:jwt:${fnvFingerprint(rawChild.trim())}]`;
+        out[key] = `[REDACTED:${kind}:${fnvFingerprint(rawChild.trim())}]`;
       } else {
         out[key] = sanitizeJsonValue(rawChild, childPath, redactedFields);
       }
@@ -386,28 +443,64 @@ export function classifyEntry(
   return { category: 'other', reason: 'Default classification rule' };
 }
 
+export function splitFormatSuffix(segment: string): { stem: string; suffix: string } {
+  for (const sfx of ['.json', '.xml']) {
+    if (segment.length > sfx.length && segment.toLowerCase().endsWith(sfx)) {
+      return {
+        stem: segment.slice(0, segment.length - sfx.length),
+        suffix: segment.slice(segment.length - sfx.length),
+      };
+    }
+  }
+  return { stem: segment, suffix: '' };
+}
+
+function singularizeSegmentParamCamel(prev: string): string {
+  const clean = prev.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (!clean || /^v\d+$/i.test(clean) || clean === 'api') {
+    return 'id';
+  }
+  let singular = clean;
+  if (clean.endsWith('species') || clean.endsWith('series')) {
+    singular = clean;
+  } else if (clean.endsWith('ies') && clean.length > 4) {
+    singular = `${clean.slice(0, -3)}y`;
+  } else if (clean.endsWith('sses') || clean.endsWith('xes') || clean.endsWith('ches')) {
+    singular = clean.slice(0, -2);
+  } else if (clean.length > 2 && clean.endsWith('s') && !clean.endsWith('ss')) {
+    singular = clean.slice(0, -1);
+  }
+  const camel = singular.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
+  return `${camel}Id`;
+}
+
 export function parameterizePath(path: string): string {
   const segments = path.split('/').filter(Boolean);
   if (segments.length === 0) {
     return '/';
   }
   const normalized = segments.map((seg, idx) => {
-    if (/^v\d+$/i.test(seg)) {
+    const { stem, suffix } = splitFormatSuffix(seg);
+    if (/^v\d+$/i.test(stem)) {
       return seg;
     }
     if (
-      /^\d+$/.test(seg) ||
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) ||
-      /^(ord|usr|cus|sess|tok|item)_[a-z0-9_-]+$/i.test(seg)
+      /^\d+$/.test(stem) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stem) ||
+      /^(ord|usr|cus|sess|tok|item)_[a-z0-9_-]+$/i.test(stem)
     ) {
       const prev = idx > 0 ? segments[idx - 1] ?? '' : '';
-      if (prev === 'orders') {
-        return '{orderId}';
-      }
-      if (prev === 'users') {
-        return '{userId}';
-      }
-      return '{id}';
+      const paramName =
+        prev === 'orders'
+          ? 'orderId'
+          : prev === 'users'
+            ? 'userId'
+            : prev === 'item'
+              ? 'itemId'
+              : prev
+                ? singularizeSegmentParamCamel(prev)
+                : 'id';
+      return `{${paramName}}${suffix}`;
     }
     return seg;
   });

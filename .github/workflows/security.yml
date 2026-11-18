@@ -1,0 +1,22 @@
+name: Security CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-tests:
+    name: Secret redaction & hygiene verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run security crate tests & repo secret scan
+        run: cargo test -p harflow-security --all-targets
+      - name: Run replay policy tests
+        run: cargo test -p harflow-replay --all-targets
+      - name: Run AI policy gate tests
+        run: cargo test -p harflow-ai --all-targets

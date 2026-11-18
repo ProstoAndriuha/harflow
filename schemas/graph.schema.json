@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://harflow.dev/schemas/graph.schema.json",
+  "title": "HARFlow Graph ViewModel",
+  "description": "Serializable graph view produced by harflow-graph and rendered by the UI or CLI.",
+  "type": "object",
+  "required": ["schemaVersion", "projectId", "kind", "nodes", "edges", "hasCycles"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "projectId": { "type": "string" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "request_dependency",
+        "endpoint",
+        "auth_flow",
+        "session_timeline",
+        "data_flow"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "nodeType", "method", "host"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "nodeType": { "type": "string" },
+          "method": { "type": ["string", "null"] },
+          "host": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceNodeId", "targetNodeId", "status", "confidence", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "sourceNodeId": { "type": "string" },
+          "targetNodeId": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["confirmed", "likely", "unknown", "rejected", "user_confirmed"]
+          },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "hasCycles": { "type": "boolean" }
+  }
+}

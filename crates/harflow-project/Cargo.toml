@@ -1,0 +1,18 @@
+[package]
+name = "harflow-project"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+harflow-core = { path = "../harflow-core" }
+harflow-endpoints = { path = "../harflow-endpoints" }
+harflow-graph = { path = "../harflow-graph" }
+harflow-har = { path = "../harflow-har" }
+harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
+harflow-sessions = { path = "../harflow-sessions" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }

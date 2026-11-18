@@ -1,0 +1,9 @@
+[package]
+name = "harflow-classifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-normalizer = { path = "../harflow-normalizer" }
+serde = { workspace = true }

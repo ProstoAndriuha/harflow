@@ -1,0 +1,25 @@
+{
+  "name": "@harflow/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@harflow/config": "workspace:*",
+    "@types/node": "^22.13.5",
+    "typescript": "~5.7.3",
+    "vitest": "^3.0.7"
+  }
+}

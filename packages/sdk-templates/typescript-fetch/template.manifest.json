@@ -1,0 +1,15 @@
+{
+  "id": "typescript-fetch",
+  "language": "typescript",
+  "runtime": "fetch",
+  "asyncFirst": true,
+  "requiresEmbeddedSecrets": false,
+  "files": [
+    "package.json",
+    "tsconfig.json",
+    "README.md",
+    "src/client.ts",
+    "src/types.ts",
+    "src/auth.ts"
+  ]
+}

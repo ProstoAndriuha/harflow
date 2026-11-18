@@ -1,0 +1,11 @@
+[package]
+name = "harflow-generator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-core = { path = "../harflow-core" }
+harflow-model = { path = "../harflow-model" }
+harflow-security = { path = "../harflow-security" }
+serde = { workspace = true }

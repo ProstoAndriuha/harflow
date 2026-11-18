@@ -1,0 +1,15 @@
+{
+  "id": "python-httpx",
+  "language": "python",
+  "runtime": "httpx+pydantic",
+  "asyncFirst": true,
+  "requiresEmbeddedSecrets": false,
+  "files": [
+    "pyproject.toml",
+    "README.md",
+    "harflow_sdk/client.py",
+    "harflow_sdk/models.py",
+    "harflow_sdk/auth.py",
+    "tests/test_client.py"
+  ]
+}

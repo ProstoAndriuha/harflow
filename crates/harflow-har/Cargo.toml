@@ -1,0 +1,10 @@
+[package]
+name = "harflow-har"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-core = { path = "../harflow-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }

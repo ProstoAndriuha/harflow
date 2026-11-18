@@ -1,0 +1,9 @@
+[package]
+name = "harflow-dependencies"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-model = { path = "../harflow-model" }
+serde = { workspace = true }

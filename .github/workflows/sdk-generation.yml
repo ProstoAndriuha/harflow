@@ -1,0 +1,23 @@
+name: SDK Generation CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sdk-generation:
+    name: SDK generator & template validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run SDK & OpenAPI generator tests
+        run: |
+          cargo test -p harflow-generator --all-targets
+          cargo test -p harflow-openapi --all-targets
+      - name: Verify SDK template manifests are valid JSON
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('packages/sdk-templates/python-httpx/template.manifest.json','utf8')); JSON.parse(require('fs').readFileSync('packages/sdk-templates/typescript-fetch/template.manifest.json','utf8'));"

@@ -1,0 +1,13 @@
+[package]
+name = "harflow-endpoints"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-classifier = { path = "../harflow-classifier" }
+harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
+
+[dev-dependencies]
+harflow-har = { path = "../harflow-har" }

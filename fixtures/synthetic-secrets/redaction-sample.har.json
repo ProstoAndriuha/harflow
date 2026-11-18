@@ -1,0 +1,40 @@
+{
+  "log": {
+    "version": "1.2",
+    "entries": [
+      {
+        "startedDateTime": "2026-11-18T00:05:00.000Z",
+        "time": 21.0,
+        "request": {
+          "method": "POST",
+          "url": "https://api.example.test/v1/session?api_key=hf_synthetic_api_key_0004",
+          "headers": [
+            { "name": "Authorization", "value": "Bearer hf_synthetic_bearer_secret_0001" },
+            { "name": "Cookie", "value": "sid=hf_synthetic_cookie_secret_0002" }
+          ],
+          "queryString": [
+            { "name": "api_key", "value": "hf_synthetic_api_key_0004" }
+          ],
+          "cookies": [
+            { "name": "sid", "value": "hf_synthetic_cookie_secret_0002" }
+          ],
+          "postData": {
+            "mimeType": "application/json",
+            "text": "{\"username\":\"tester\",\"password\":\"hf_synthetic_password_0003\"}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": [
+            { "name": "Set-Cookie", "value": "sid=hf_synthetic_cookie_secret_0002; HttpOnly" }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"ok\":true}"
+          }
+        }
+      }
+    ]
+  }
+}

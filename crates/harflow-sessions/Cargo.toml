@@ -1,0 +1,14 @@
+[package]
+name = "harflow-sessions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
+serde = { workspace = true }
+
+[dev-dependencies]
+harflow-har = { path = "../harflow-har" }
+serde_json = { workspace = true }

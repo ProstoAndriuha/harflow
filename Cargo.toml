@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/harflow-core",
+    "crates/harflow-model",
+    "crates/harflow-security",
+    "crates/harflow-har",
+    "crates/harflow-normalizer",
+    "crates/harflow-classifier",
+    "crates/harflow-endpoints",
+    "crates/harflow-schema",
+    "crates/harflow-dependencies",
+    "crates/harflow-sessions",
+    "crates/harflow-graph",
+    "crates/harflow-project",
+    "crates/harflow-generator",
+    "crates/harflow-openapi",
+    "crates/harflow-replay",
+    "crates/harflow-report",
+    "crates/harflow-ai",
+    "crates/harflow-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["derive"] }

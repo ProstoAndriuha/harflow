@@ -1,0 +1,60 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "HARFlow Synthetic Fixture Generator",
+      "version": "1.0.0"
+    },
+    "entries": [
+      {
+        "startedDateTime": "2026-11-18T00:00:01.000Z",
+        "time": 24.5,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/users/101?include=profile",
+          "headers": [
+            { "name": "Accept", "value": "application/json" }
+          ],
+          "queryString": [
+            { "name": "include", "value": "profile" }
+          ]
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": [
+            { "name": "Content-Type", "value": "application/json" }
+          ],
+          "content": {
+            "size": 42,
+            "mimeType": "application/json",
+            "text": "{\"id\":101,\"name\":\"Alice\",\"role\":\"developer\"}"
+          }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T00:00:02.000Z",
+        "time": 31.2,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/users/202",
+          "headers": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": [
+            { "name": "Content-Type", "value": "application/json" }
+          ],
+          "content": {
+            "size": 39,
+            "mimeType": "application/json",
+            "text": "{\"id\":202,\"name\":\"Bob\",\"role\":\"reviewer\"}"
+          }
+        }
+      }
+    ]
+  }
+}

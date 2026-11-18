@@ -1,0 +1,27 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+
+# Node / pnpm / Frontend build artifacts
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Local environment & runtime data
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-*
+
+# OS & Editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+/tmp/

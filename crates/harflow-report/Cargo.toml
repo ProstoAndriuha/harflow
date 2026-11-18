@@ -1,0 +1,11 @@
+[package]
+name = "harflow-report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+harflow-core = { path = "../harflow-core" }
+harflow-model = { path = "../harflow-model" }
+serde = { workspace = true }

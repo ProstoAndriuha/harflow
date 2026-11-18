@@ -1,0 +1,45 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": { "name": "HARFlow Synthetic Dependency Fixture", "version": "1.0.0" },
+    "entries": [
+      {
+        "startedDateTime": "2026-11-18T00:02:00.000Z",
+        "time": 18.0,
+        "request": {
+          "method": "POST",
+          "url": "https://api.example.test/v1/orders",
+          "headers": [{ "name": "Content-Type", "value": "application/json" }],
+          "postData": {
+            "mimeType": "application/json",
+            "text": "{\"sku\":\"widget-01\",\"qty\":2}"
+          }
+        },
+        "response": {
+          "status": 201,
+          "statusText": "Created",
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"orderId\":\"ord_synthetic_9001\",\"status\":\"created\"}"
+          }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T00:02:01.000Z",
+        "time": 14.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/orders/ord_synthetic_9001"
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"orderId\":\"ord_synthetic_9001\",\"status\":\"paid\"}"
+          }
+        }
+      }
+    ]
+  }
+}

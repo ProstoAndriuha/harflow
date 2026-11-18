@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://harflow.dev/schemas/project.schema.json",
+  "title": "HARFlow Project Manifest",
+  "description": "Portable versioned manifest for a local HARFlow project.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "sources",
+    "settings",
+    "statistics",
+    "generatorVersions",
+    "exportMetadata"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "importedAt", "entryCount", "redactedSecretsCount"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "harVersion": { "type": "string" },
+          "importedAt": { "type": "string" },
+          "entryCount": { "type": "integer", "minimum": 0 },
+          "redactedSecretsCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "required": ["retainOriginalHar", "maxHarSizeBytes", "offlineOnly"],
+      "properties": {
+        "retainOriginalHar": { "type": "boolean", "default": false },
+        "maxHarSizeBytes": { "type": "integer", "minimum": 1, "default": 104857600 },
+        "offlineOnly": { "type": "boolean", "default": true }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "required": [
+        "totalRequests",
+        "uniqueEndpoints",
+        "apiDomains",
+        "dependencies",
+        "authFlows",
+        "unknownMappings"
+      ],
+      "properties": {
+        "totalRequests": { "type": "integer", "minimum": 0 },
+        "uniqueEndpoints": { "type": "integer", "minimum": 0 },
+        "apiDomains": { "type": "integer", "minimum": 0 },
+        "dependencies": { "type": "integer", "minimum": 0 },
+        "authFlows": { "type": "integer", "minimum": 0 },
+        "unknownMappings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "generatorVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "exportMetadata": {
+      "type": "object",
+      "properties": {
+        "lastExportedAt": { "type": ["string", "null"] },
+        "lastFormats": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

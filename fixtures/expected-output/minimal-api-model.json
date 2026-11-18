@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectId": "proj-synthetic-0001",
+  "sources": [
+    {
+      "id": "sess-0001",
+      "name": "minimal-rest.har.json",
+      "harVersion": "1.2",
+      "importedAt": "2026-11-18T00:00:00Z",
+      "entryCount": 2,
+      "redactedSecretsCount": 0
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "ep-0001",
+      "operationId": "get_v1_users_id",
+      "method": "GET",
+      "host": "api.example.test",
+      "pathTemplate": "/v1/users/{id}",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "inferredType": "string",
+          "required": true,
+          "observedCount": 2
+        }
+      ],
+      "requestSchemaId": null,
+      "responseSchemaId": null,
+      "statusCodes": [200],
+      "confidence": 0.95,
+      "category": "api",
+      "observedRequestIds": ["sess-0001-req-0001", "sess-0001-req-0002"]
+    }
+  ],
+  "schemas": [],
+  "dependencies": [
+    {
+      "id": "dep-0001",
+      "source": {
+        "sessionId": "sess-0001",
+        "requestId": "sess-0001-req-0001",
+        "location": "response_body",
+        "jsonPathOrKey": "$.id"
+      },
+      "target": {
+        "sessionId": "sess-0001",
+        "requestId": "sess-0001-req-0002",
+        "location": "path",
+        "jsonPathOrKey": "id"
+      },
+      "type": "response_to_path",
+      "transformation": "identity",
+      "confidence": 0.84,
+      "status": "likely",
+      "evidence": [
+        {
+          "sessionId": "sess-0001",
+          "requestId": "sess-0001-req-0002",
+          "ruleId": "rule-value-reuse",
+          "description": "Value matched across sequential request path",
+          "observedAt": "2026-11-18T00:00:02Z"
+        }
+      ],
+      "observedSessionIds": ["sess-0001"]
+    }
+  ],
+  "authFlows": [],
+  "workflows": [],
+  "diagnostics": [],
+  "metadata": {
+    "projectName": "Synthetic REST Sample",
+    "generatedAt": "2026-11-18T00:00:05Z",
+    "generatorVersion": "0.1.0",
+    "totalRequests": 2,
+    "excludedRequests": 0
+  }
+}

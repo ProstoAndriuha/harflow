@@ -1,0 +1,30 @@
+name: Integration CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cli-pipeline:
+    name: End-to-end CLI smoke pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build harflow CLI
+        run: cargo build -p harflow-cli
+      - name: Run CLI integration tests
+        run: cargo test -p harflow-cli --tests
+      - name: Run fixture smoke flow
+        run: |
+          cargo run -p harflow-cli -- doctor --json
+          cargo run -p harflow-cli -- import fixtures/har-valid/minimal-rest.har.json --project ./ci-demo-project
+          cargo run -p harflow-cli -- analyze ./ci-demo-project
+          cargo run -p harflow-cli -- endpoints ./ci-demo-project --json
+          cargo run -p harflow-cli -- graph ./ci-demo-project --format json
+          cargo run -p harflow-cli -- export ./ci-demo-project --format openapi --output ./ci-out
+          cargo run -p harflow-cli -- report ./ci-demo-project --format markdown --output ./ci-out
+          rm -rf ./ci-demo-project ./ci-out

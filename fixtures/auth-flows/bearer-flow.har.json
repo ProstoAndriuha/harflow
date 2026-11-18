@@ -1,0 +1,48 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": { "name": "HARFlow Synthetic Auth Fixture", "version": "1.0.0" },
+    "entries": [
+      {
+        "startedDateTime": "2026-11-18T00:01:00.000Z",
+        "time": 42.0,
+        "request": {
+          "method": "POST",
+          "url": "https://auth.example.test/oauth/token",
+          "headers": [{ "name": "Content-Type", "value": "application/json" }],
+          "postData": {
+            "mimeType": "application/json",
+            "text": "{\"username\":\"demo_user\",\"password\":\"hf_synthetic_password_0001\"}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"access_token\":\"hf_synthetic_token_0001\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
+          }
+        }
+      },
+      {
+        "startedDateTime": "2026-11-18T00:01:01.000Z",
+        "time": 19.0,
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.test/v1/me",
+          "headers": [
+            { "name": "Authorization", "value": "Bearer hf_synthetic_token_0001" }
+          ]
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\":\"usr_synthetic_01\",\"email\":\"demo@example.test\"}"
+          }
+        }
+      }
+    ]
+  }
+}

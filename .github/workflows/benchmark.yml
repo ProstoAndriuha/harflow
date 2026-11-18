@@ -1,0 +1,19 @@
+name: Benchmark CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  benchmark-smoke:
+    name: Release build & CLI startup budget smoke check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release CLI
+        run: cargo build -p harflow-cli --release
+      - name: Smoke check doctor startup
+        run: ./target/release/harflow doctor --json

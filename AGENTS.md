@@ -138,6 +138,7 @@ Never silently ignore a bug to report progress.
 
 ## Git Rules
 
+- Remote repository: `https://github.com/ProstoAndriuha/harflow` (`origin`, default branch `main`).
 - Use focused commits.
 - Never force-push without authorization.
 - Never commit secrets.
@@ -145,6 +146,7 @@ Never silently ignore a bug to report progress.
 - Prefer descriptive conventional commit messages.
 - Keep generated files and binaries out of Git unless explicitly required.
 - Preserve a stable baseline for major refactoring.
+- Push verified commits to `origin` after completing checkpoints once quality gates and secret-hygiene scans pass (`git push origin main`), then verify sync status (`git status -sb`).
 
 ## Checkpoint Policy
 
@@ -159,6 +161,7 @@ Each checkpoint must record:
 - Tests executed.
 - Known limitations.
 - Commit SHA, if available.
+- Remote sync status (pushed commit SHA on `origin/main`).
 - Recommended next task.
 
 ## Session Recovery

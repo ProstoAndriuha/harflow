@@ -1,6 +1,7 @@
 # HARFlow Project State
 
 **Last Updated:** 2026-11-18
+**Repository:** `https://github.com/ProstoAndriuha/harflow` (`public`, branch `main`)
 **Current Phase:** Phase 0 — Foundation (`DONE`)
 **Next Phase:** Phase 1 — Import & Normalization (`READY`)
 **Toolchain:**

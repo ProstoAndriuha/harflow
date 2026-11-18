@@ -1,0 +1,553 @@
+{
+  "name": "Phase 3 Primary Dependency Evaluation Dataset",
+  "scenarios": [
+    {
+      "id": "ecommerce_order_flow",
+      "description": "Two-session ecommerce checkout flow: OAuth Bearer, Set-Cookie -> Cookie, POST order -> GET order path & POST payment body, Cursor pagination, and weak/pre-existing distractors",
+      "sessions": [
+        {
+          "sessionId": "sess-ecom-a",
+          "sourceName": "ecom-a.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T10:00:00Z",
+                  "time": 12.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/oauth/token",
+                    "postData": { "mimeType": "application/json", "text": "{\"grant_type\":\"client_credentials\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "headers": [{ "name": "Set-Cookie", "value": "sid=hf_synthetic_ecom_sid_a; HttpOnly" }],
+                    "content": { "mimeType": "application/json", "text": "{\"access_token\":\"hf_synthetic_ecom_at_a\",\"token_type\":\"Bearer\",\"expires_in\":3600}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T10:00:01Z",
+                  "time": 14.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/orders",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_a" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_a" }
+                    ],
+                    "postData": { "mimeType": "application/json", "text": "{\"sku\":\"sku_abc_1\",\"currency\":\"USD\"}" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"ord_synthetic_a101\",\"status\":\"pending\",\"count\":1,\"currency\":\"USD\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T10:00:02Z",
+                  "time": 10.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/orders/ord_synthetic_a101?limit=20&sort=asc&status=pending",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_a" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_a" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"ord_synthetic_a101\",\"total\":99,\"status\":\"pending\",\"limit\":20}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T10:00:03Z",
+                  "time": 15.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/payments",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_a" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_a" }
+                    ],
+                    "postData": { "mimeType": "application/json", "text": "{\"orderId\":\"ord_synthetic_a101\",\"currency\":\"USD\",\"amount\":99}" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"paymentId\":\"pay_synthetic_a1\",\"ok\":true}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T10:00:04Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/products?limit=20&cursor=cur_preexisting_0",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_a" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_a" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[{\"id\":\"prd_1\"}],\"nextCursor\":\"cur_synthetic_a2\",\"limit\":20,\"echo\":\"cur_preexisting_0\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T10:00:05Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/products?limit=20&cursor=cur_synthetic_a2",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_a" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_a" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[{\"id\":\"prd_2\"}],\"nextCursor\":\"cur_synthetic_a3\"}" }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "sessionId": "sess-ecom-b",
+          "sourceName": "ecom-b.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T11:00:00Z",
+                  "time": 12.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/oauth/token",
+                    "postData": { "mimeType": "application/json", "text": "{\"grant_type\":\"client_credentials\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "headers": [{ "name": "Set-Cookie", "value": "sid=hf_synthetic_ecom_sid_b; HttpOnly" }],
+                    "content": { "mimeType": "application/json", "text": "{\"access_token\":\"hf_synthetic_ecom_at_b\",\"token_type\":\"Bearer\",\"expires_in\":3600}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T11:00:01Z",
+                  "time": 14.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/orders",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_b" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_b" }
+                    ],
+                    "postData": { "mimeType": "application/json", "text": "{\"sku\":\"sku_abc_2\",\"currency\":\"USD\"}" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"ord_synthetic_b202\",\"status\":\"pending\",\"count\":1,\"currency\":\"USD\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T11:00:02Z",
+                  "time": 10.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/orders/ord_synthetic_b202?limit=20&sort=asc&status=pending",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_b" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_b" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"ord_synthetic_b202\",\"total\":45,\"status\":\"pending\",\"limit\":20}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T11:00:03Z",
+                  "time": 15.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/payments",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_b" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_b" }
+                    ],
+                    "postData": { "mimeType": "application/json", "text": "{\"orderId\":\"ord_synthetic_b202\",\"currency\":\"USD\",\"amount\":45}" }
+                  },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"paymentId\":\"pay_synthetic_b1\",\"ok\":true}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T11:00:04Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/products?limit=20&cursor=cur_preexisting_0",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_b" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_b" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[{\"id\":\"prd_3\"}],\"nextCursor\":\"cur_synthetic_b2\",\"limit\":20,\"echo\":\"cur_preexisting_0\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T11:00:05Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/products?limit=20&cursor=cur_synthetic_b2",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_ecom_at_b" },
+                      { "name": "Cookie", "value": "sid=hf_synthetic_ecom_sid_b" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"items\":[{\"id\":\"prd_4\"}],\"nextCursor\":\"cur_synthetic_b3\"}" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "POST /v1/orders", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "GET /v1/orders/{order_id}", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "POST /v1/payments", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "GET /v1/products", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "set_cookie", "sourceKey": "sid", "targetEndpoint": "POST /v1/orders", "targetLocation": "cookie", "targetKey": "sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "set_cookie", "sourceKey": "sid", "targetEndpoint": "GET /v1/orders/{order_id}", "targetLocation": "cookie", "targetKey": "sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "set_cookie", "sourceKey": "sid", "targetEndpoint": "POST /v1/payments", "targetLocation": "cookie", "targetKey": "sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "set_cookie", "sourceKey": "sid", "targetEndpoint": "GET /v1/products", "targetLocation": "cookie", "targetKey": "sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "POST /v1/orders", "sourceLocation": "response_body", "sourceKey": "$.id", "targetEndpoint": "GET /v1/orders/{order_id}", "targetLocation": "path", "targetKey": "order_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/orders", "sourceLocation": "response_body", "sourceKey": "$.id", "targetEndpoint": "POST /v1/payments", "targetLocation": "body", "targetKey": "$.orderId", "dependencyType": "response_to_body" },
+        { "sourceEndpoint": "GET /v1/products", "sourceLocation": "response_body", "sourceKey": "$.nextCursor", "targetEndpoint": "GET /v1/products", "targetLocation": "query", "targetKey": "cursor", "dependencyType": "pagination_chain" }
+      ]
+    },
+    {
+      "id": "url_base64_and_header_propagation",
+      "description": "URL-encoded cursor, Base64 header token, X-Correlation-Id header -> query, plus 404 error/preexisting/reverse distractors",
+      "sessions": [
+        {
+          "sessionId": "sess-trans-1",
+          "sourceName": "trans.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T12:00:00Z",
+                  "time": 5.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/missing/item_999" },
+                  "response": { "status": 404, "content": { "mimeType": "application/json", "text": "{\"traceId\":\"err_trace_404\",\"message\":\"not found\"}" } }
+                },
+                {
+                  "startedDateTime": "2026-11-18T12:00:01Z",
+                  "time": 8.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/search/init?prev=pre_tok_11",
+                    "postData": { "mimeType": "application/json", "text": "{\"query\":\"widgets\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "headers": [{ "name": "X-Correlation-Id", "value": "corr_synthetic_7788" }],
+                    "content": { "mimeType": "application/json", "text": "{\"cursorToken\":\"scope:a/b=1\",\"exportSecret\":\"export_val_551\",\"echo\":\"pre_tok_11\",\"ok\":true}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T12:00:02Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/search/results?cursor=scope%3Aa%2Fb%3D1&correlationId=corr_synthetic_7788&trace=err_trace_404&prev=pre_tok_11",
+                    "headers": [
+                      { "name": "X-Export-Token", "value": "ZXhwb3J0X3ZhbF81NTE=" }
+                    ]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"results\":[],\"reverseOnly\":\"rev_id_1\"}" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /v1/search/init", "sourceLocation": "response_body", "sourceKey": "$.cursorToken", "targetEndpoint": "GET /v1/search/results", "targetLocation": "query", "targetKey": "cursor", "dependencyType": "response_to_query", "transformation": "url_encoding" },
+        { "sourceEndpoint": "POST /v1/search/init", "sourceLocation": "response_header", "sourceKey": "X-Correlation-Id", "targetEndpoint": "GET /v1/search/results", "targetLocation": "query", "targetKey": "correlationId", "dependencyType": "response_to_query" },
+        { "sourceEndpoint": "POST /v1/search/init", "sourceLocation": "response_body", "sourceKey": "$.exportSecret", "targetEndpoint": "GET /v1/search/results", "targetLocation": "header", "targetKey": "X-Export-Token", "dependencyType": "response_to_header", "transformation": "base64" }
+      ]
+    },
+    {
+      "id": "oauth_rotation_and_csrf",
+      "description": "Session init cookie+CSRF, OAuth token issue, 401 refresh rotation, and CSRF header usage",
+      "sessions": [
+        {
+          "sessionId": "sess-rot-1",
+          "sourceName": "rot.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T13:00:00Z",
+                  "time": 7.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/session/init" },
+                  "response": {
+                    "status": 200,
+                    "headers": [{ "name": "Set-Cookie", "value": "session_sid=hf_synthetic_rot_sid_1; HttpOnly" }],
+                    "content": { "mimeType": "application/json", "text": "{\"csrf_token\":\"hf_synthetic_csrf_rot_1\",\"role\":\"admin\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T13:00:01Z",
+                  "time": 11.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/oauth/token",
+                    "headers": [{ "name": "Cookie", "value": "session_sid=hf_synthetic_rot_sid_1" }],
+                    "postData": { "mimeType": "application/json", "text": "{\"grant_type\":\"client_credentials\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"access_token\":\"hf_synthetic_at_rot_1\",\"refresh_token\":\"hf_synthetic_rt_rot_1\",\"expires_in\":60}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T13:00:02Z",
+                  "time": 8.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/settings",
+                    "headers": [
+                      { "name": "Authorization", "value": "Bearer hf_synthetic_at_rot_1" },
+                      { "name": "X-CSRF-Token", "value": "hf_synthetic_csrf_rot_1" },
+                      { "name": "Cookie", "value": "session_sid=hf_synthetic_rot_sid_1" }
+                    ],
+                    "postData": { "mimeType": "application/x-www-form-urlencoded", "text": "theme=dark" }
+                  },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"saved\":true}" } }
+                },
+                {
+                  "startedDateTime": "2026-11-18T13:00:03Z",
+                  "time": 10.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/oauth/refresh",
+                    "postData": { "mimeType": "application/json", "text": "{\"grant_type\":\"refresh_token\",\"refresh_token\":\"hf_synthetic_rt_rot_1\"}" }
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"access_token\":\"hf_synthetic_at_rot_2\",\"refresh_token\":\"hf_synthetic_rt_rot_2\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T13:00:04Z",
+                  "time": 6.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/me",
+                    "headers": [{ "name": "Authorization", "value": "Bearer hf_synthetic_at_rot_2" }]
+                  },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"user\":\"alice\"}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "GET /v1/session/init", "sourceLocation": "set_cookie", "sourceKey": "session_sid", "targetEndpoint": "POST /oauth/token", "targetLocation": "cookie", "targetKey": "session_sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "GET /v1/session/init", "sourceLocation": "set_cookie", "sourceKey": "session_sid", "targetEndpoint": "POST /v1/settings", "targetLocation": "cookie", "targetKey": "session_sid", "dependencyType": "set_cookie_to_cookie" },
+        { "sourceEndpoint": "GET /v1/session/init", "sourceLocation": "response_body", "sourceKey": "$.csrf_token", "targetEndpoint": "POST /v1/settings", "targetLocation": "header", "targetKey": "X-CSRF-Token", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "POST /v1/settings", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /oauth/token", "sourceLocation": "response_body", "sourceKey": "$.refresh_token", "targetEndpoint": "POST /oauth/refresh", "targetLocation": "body", "targetKey": "$.refresh_token", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "POST /oauth/refresh", "sourceLocation": "response_body", "sourceKey": "$.access_token", "targetEndpoint": "GET /v1/me", "targetLocation": "header", "targetKey": "Authorization", "dependencyType": "session_chain", "transformation": "prefix_suffix" }
+      ]
+    },
+    {
+      "id": "cross_session_isolation_and_weak_distractors",
+      "description": "Hard negatives only: reverse chronological, cross-session leak attempt, booleans, small numbers, mode/locale constants",
+      "sessions": [
+        {
+          "sessionId": "sess-iso-1",
+          "sourceName": "iso1.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T14:00:00Z",
+                  "time": 5.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/catalog" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"itemCode\":\"item_s1_isolated\",\"small\":5,\"ok\":true,\"mode\":\"auto\"}" } }
+                },
+                {
+                  "startedDateTime": "2026-11-18T14:00:01Z",
+                  "time": 5.0,
+                  "request": {
+                    "method": "POST",
+                    "url": "https://api.example.test/v1/reports?limit=5",
+                    "postData": { "mimeType": "application/json", "text": "{\"ok\":true,\"mode\":\"auto\",\"futureRef\":\"future_only_777\"}" }
+                  },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"futureRef\":\"future_only_777\"}" } }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "sessionId": "sess-iso-2",
+          "sourceName": "iso2.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T15:00:00Z",
+                  "time": 5.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/cart?item=item_s1_isolated" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"items\":[]}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": []
+    },
+    {
+      "id": "location_header_and_nested_workspace_ids",
+      "description": "Location header trailing ID -> Path plus nested workspace/project ID propagation",
+      "sessions": [
+        {
+          "sessionId": "sess-ws-1",
+          "sourceName": "ws.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T16:00:00Z",
+                  "time": 10.0,
+                  "request": { "method": "POST", "url": "https://api.example.test/v1/uploads" },
+                  "response": {
+                    "status": 201,
+                    "headers": [{ "name": "Location", "value": "https://api.example.test/v1/uploads/upl_synthetic_700" }],
+                    "content": { "mimeType": "application/json", "text": "{\"status\":\"queued\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T16:00:01Z",
+                  "time": 8.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/uploads/upl_synthetic_700" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"status\":\"ready\"}" } }
+                },
+                {
+                  "startedDateTime": "2026-11-18T16:00:02Z",
+                  "time": 10.0,
+                  "request": { "method": "POST", "url": "https://api.example.test/v1/workspaces" },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"workspace\":{\"id\":\"ws_synthetic_501\",\"plan\":\"pro\"}}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T16:00:03Z",
+                  "time": 10.0,
+                  "request": { "method": "POST", "url": "https://api.example.test/v1/workspaces/ws_synthetic_501/projects" },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"id\":\"prj_synthetic_801\",\"nested\":{\"ownerId\":\"usr_synthetic_12\"}}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T16:00:04Z",
+                  "time": 8.0,
+                  "request": { "method": "GET", "url": "https://api.example.test/v1/projects/prj_synthetic_801?ownerId=usr_synthetic_12" },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"ok\":true}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /v1/uploads", "sourceLocation": "response_header", "sourceKey": "Location", "targetEndpoint": "GET /v1/uploads/{upload_id}", "targetLocation": "path", "targetKey": "upload_id", "dependencyType": "response_to_path", "transformation": "prefix_suffix" },
+        { "sourceEndpoint": "POST /v1/workspaces", "sourceLocation": "response_body", "sourceKey": "$.workspace.id", "targetEndpoint": "POST /v1/workspaces/{workspace_id}/projects", "targetLocation": "path", "targetKey": "workspace_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/workspaces/{workspace_id}/projects", "sourceLocation": "response_body", "sourceKey": "$.id", "targetEndpoint": "GET /v1/projects/{project_id}", "targetLocation": "path", "targetKey": "project_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/workspaces/{workspace_id}/projects", "sourceLocation": "response_body", "sourceKey": "$.nested.ownerId", "targetEndpoint": "GET /v1/projects/{project_id}", "targetLocation": "query", "targetKey": "ownerId", "dependencyType": "response_to_query" }
+      ]
+    },
+    {
+      "id": "api_key_and_array_element_extraction",
+      "description": "API key exchange -> X-API-Key header, array item ID -> Path, zero/boolean distractor exclusion",
+      "sessions": [
+        {
+          "sessionId": "sess-ak-1",
+          "sourceName": "ak.har",
+          "har": {
+            "log": {
+              "version": "1.2",
+              "entries": [
+                {
+                  "startedDateTime": "2026-11-18T17:00:00Z",
+                  "time": 10.0,
+                  "request": { "method": "POST", "url": "https://api.example.test/v1/clients/register" },
+                  "response": {
+                    "status": 201,
+                    "content": { "mimeType": "application/json", "text": "{\"clientId\":\"cli_synthetic_300\",\"api_key\":\"hf_synthetic_key_300\"}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T17:00:01Z",
+                  "time": 9.0,
+                  "request": {
+                    "method": "GET",
+                    "url": "https://api.example.test/v1/clients/cli_synthetic_300/quotas",
+                    "headers": [{ "name": "X-API-Key", "value": "hf_synthetic_key_300" }]
+                  },
+                  "response": {
+                    "status": 200,
+                    "content": { "mimeType": "application/json", "text": "{\"quotas\":[{\"quotaId\":\"qta_synthetic_901\",\"used\":0}]}" }
+                  }
+                },
+                {
+                  "startedDateTime": "2026-11-18T17:00:02Z",
+                  "time": 10.0,
+                  "request": {
+                    "method": "PATCH",
+                    "url": "https://api.example.test/v1/quotas/qta_synthetic_901",
+                    "headers": [{ "name": "X-API-Key", "value": "hf_synthetic_key_300" }],
+                    "postData": { "mimeType": "application/json", "text": "{\"clientId\":\"cli_synthetic_300\"}" }
+                  },
+                  "response": { "status": 200, "content": { "mimeType": "application/json", "text": "{\"updated\":true}" } }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedDependencies": [
+        { "sourceEndpoint": "POST /v1/clients/register", "sourceLocation": "response_body", "sourceKey": "$.clientId", "targetEndpoint": "GET /v1/clients/{client_id}/quotas", "targetLocation": "path", "targetKey": "client_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/clients/register", "sourceLocation": "response_body", "sourceKey": "$.api_key", "targetEndpoint": "GET /v1/clients/{client_id}/quotas", "targetLocation": "header", "targetKey": "X-API-Key", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "GET /v1/clients/{client_id}/quotas", "sourceLocation": "response_body", "sourceKey": "$.quotas[*].quotaId", "targetEndpoint": "PATCH /v1/quotas/{quota_id}", "targetLocation": "path", "targetKey": "quota_id", "dependencyType": "response_to_path" },
+        { "sourceEndpoint": "POST /v1/clients/register", "sourceLocation": "response_body", "sourceKey": "$.api_key", "targetEndpoint": "PATCH /v1/quotas/{quota_id}", "targetLocation": "header", "targetKey": "X-API-Key", "dependencyType": "session_chain" },
+        { "sourceEndpoint": "POST /v1/clients/register", "sourceLocation": "response_body", "sourceKey": "$.clientId", "targetEndpoint": "PATCH /v1/quotas/{quota_id}", "targetLocation": "body", "targetKey": "$.clientId", "dependencyType": "response_to_body" }
+      ]
+    }
+  ]
+}

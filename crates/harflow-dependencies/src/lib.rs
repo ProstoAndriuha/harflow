@@ -1,8 +1,13 @@
 pub mod detector;
+pub mod eval;
 pub mod extractor;
 pub mod timeline;
 
 pub use detector::detect_dependencies;
+pub use eval::{
+    evaluate_scenario, summarize_dataset_evaluation, DatasetEvaluationSummary, ExpectedDependency,
+    ScenarioEvaluationResult,
+};
 pub use extractor::{
     extract_candidates, extract_timeline_candidates, CandidateValue, EntryCandidates,
     ScalarTypeHint,

@@ -280,13 +280,16 @@ name = "harflow-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "flate2",
  "harflow-core",
  "harflow-generator",
  "harflow-graph",
+ "harflow-har",
  "harflow-openapi",
  "harflow-project",
  "harflow-replay",
  "harflow-report",
+ "serde",
  "serde_json",
  "uuid",
 ]

@@ -13,6 +13,7 @@ harflow-har = { path = "../harflow-har" }
 harflow-model = { path = "../harflow-model" }
 harflow-normalizer = { path = "../harflow-normalizer" }
 harflow-sessions = { path = "../harflow-sessions" }
+rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }

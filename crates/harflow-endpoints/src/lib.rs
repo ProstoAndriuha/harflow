@@ -38,9 +38,9 @@ pub fn discover_endpoints_with_overrides(
 ) -> Vec<Endpoint> {
     let entries: Vec<&NormalizedEntry> = sessions.iter().flat_map(|s| s.entries.iter()).collect();
 
-    // Index segment cardinality by (method, host, seg_count, position) for conservative sibling inference
-    // and to guard small static integers such as `/api/2/users`.
-    let mut sibling_values: BTreeMap<(String, String, usize, usize), BTreeSet<String>> =
+    // Index segment cardinality by (method, host, seg_count, position, prev_segment)
+    // for conservative sibling inference and to guard small static integers such as `/api/2/users`.
+    let mut sibling_values: BTreeMap<(String, String, usize, usize, String), BTreeSet<String>> =
         BTreeMap::new();
     let mut path_segments_cache: Vec<Vec<String>> = Vec::with_capacity(entries.len());
 
@@ -53,8 +53,19 @@ pub fn discover_endpoints_with_overrides(
             .collect();
         let seg_count = segs.len();
         for (pos, seg) in segs.iter().enumerate() {
+            let prev = if pos > 0 {
+                segs[pos - 1].clone()
+            } else {
+                String::new()
+            };
             sibling_values
-                .entry((entry.method.clone(), entry.host.clone(), seg_count, pos))
+                .entry((
+                    entry.method.clone(),
+                    entry.host.clone(),
+                    seg_count,
+                    pos,
+                    prev,
+                ))
                 .or_default()
                 .insert(seg.clone());
         }
@@ -169,9 +180,8 @@ pub fn discover_endpoints_with_overrides(
             }
             if let Some(style) = classify_pagination_query_key(qname) {
                 group.pagination_query_params.insert(qname.clone());
-                if group.pagination_style.is_none() {
-                    group.pagination_style = Some(style);
-                }
+                group.pagination_style =
+                    Some(merge_pagination_style(group.pagination_style, style));
             }
         }
 
@@ -179,9 +189,10 @@ pub fn discover_endpoints_with_overrides(
             if group.pagination_next_field.is_none() {
                 group.pagination_next_field = Some(next_field);
             }
-            if group.pagination_style.is_none() {
-                group.pagination_style = Some(PaginationStyle::Cursor);
-            }
+            group.pagination_style = Some(merge_pagination_style(
+                group.pagination_style,
+                PaginationStyle::Cursor,
+            ));
         }
     }
 
@@ -252,7 +263,7 @@ pub fn discover_endpoints_with_overrides(
 fn parameterize_segments(
     entry: &NormalizedEntry,
     segs: &[String],
-    sibling_values: &BTreeMap<(String, String, usize, usize), BTreeSet<String>>,
+    sibling_values: &BTreeMap<(String, String, usize, usize, String), BTreeSet<String>>,
     sibling_slug_positions: &BTreeSet<(String, String, usize, usize)>,
 ) -> (String, Vec<(String, SegmentParamKind)>, Vec<String>) {
     let mut param_names: Vec<(String, SegmentParamKind)> = Vec::new();
@@ -268,7 +279,13 @@ fn parameterize_segments(
             None
         };
         let sibling_cardinality = sibling_values
-            .get(&(entry.method.clone(), entry.host.clone(), seg_count, pos))
+            .get(&(
+                entry.method.clone(),
+                entry.host.clone(),
+                seg_count,
+                pos,
+                prev.unwrap_or("").to_string(),
+            ))
             .map_or(1, BTreeSet::len);
         let is_sibling_slug = sibling_slug_positions.contains(&(
             entry.method.clone(),
@@ -481,6 +498,24 @@ fn is_iso_datetime(s: &str) -> bool {
         && s.as_bytes().get(7) == Some(&b'-')
         && (s.contains('T') || s.contains('t'))
         && (s.ends_with('Z') || s.contains('+'))
+}
+
+fn merge_pagination_style(
+    current: Option<PaginationStyle>,
+    incoming: PaginationStyle,
+) -> PaginationStyle {
+    fn rank(s: PaginationStyle) -> u8 {
+        match s {
+            PaginationStyle::OffsetLimit => 1,
+            PaginationStyle::PageNumber => 2,
+            PaginationStyle::Cursor => 3,
+        }
+    }
+    match current {
+        None => incoming,
+        Some(prev) if rank(incoming) > rank(prev) => incoming,
+        Some(prev) => prev,
+    }
 }
 
 fn classify_pagination_query_key(name: &str) -> Option<PaginationStyle> {

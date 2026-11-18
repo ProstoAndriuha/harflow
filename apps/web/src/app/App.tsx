@@ -26,6 +26,7 @@ export function App({ adapter: providedAdapter }: AppProps) {
     importHarText,
     confirmDependency,
     rejectDependency,
+    updateCleaner,
   } = useHarflowStore(adapter);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -78,6 +79,9 @@ export function App({ adapter: providedAdapter }: AppProps) {
               entries={state.entries}
               selectedEntryId={state.selectedEntryId}
               onSelectEntry={selectEntry}
+              cleanerPreview={state.cleanerPreview}
+              cleanerConfig={state.manifest?.settings.cleaner}
+              onUpdateCleaner={updateCleaner}
             />
           ) : null}
 

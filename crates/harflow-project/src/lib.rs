@@ -510,7 +510,10 @@ mod tests {
             ConfirmationStatus::UserConfirmed
         );
         assert_eq!(reopened.model.endpoints.len(), 1);
-        assert_eq!(reopened.model.endpoints[0].path_template, "/v1/orders/{id}");
+        assert_eq!(
+            reopened.model.endpoints[0].path_template,
+            "/v1/orders/{order_id}"
+        );
 
         // Verify all 11 SRS tables and recorded analysis run exist in harflow.sqlite.
         let db_path = dir.join("harflow.sqlite");

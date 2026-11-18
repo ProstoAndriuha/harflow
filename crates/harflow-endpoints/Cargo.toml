@@ -8,6 +8,7 @@ license.workspace = true
 harflow-classifier = { path = "../harflow-classifier" }
 harflow-model = { path = "../harflow-model" }
 harflow-normalizer = { path = "../harflow-normalizer" }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 harflow-har = { path = "../harflow-har" }

@@ -82,6 +82,8 @@ mod tests {
             request_schema_id: None,
             response_schema_id: None,
             status_codes: vec![200],
+            status_distribution: BTreeMap::new(),
+            pagination: None,
             confidence: 0.95,
             category: "api".into(),
             observed_request_ids: vec!["r1".into()],

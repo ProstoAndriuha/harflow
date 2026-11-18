@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::Utc;
 use harflow_core::SCHEMA_VERSION;
 use serde::{Deserialize, Serialize};
@@ -74,6 +76,23 @@ pub struct EndpointParameter {
     pub observed_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaginationStyle {
+    Cursor,
+    PageNumber,
+    OffsetLimit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaginationInfo {
+    pub style: PaginationStyle,
+    pub query_params: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_next_field: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Endpoint {
@@ -87,6 +106,10 @@ pub struct Endpoint {
     pub request_schema_id: Option<String>,
     pub response_schema_id: Option<String>,
     pub status_codes: Vec<u16>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub status_distribution: BTreeMap<String, usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
     pub confidence: f64,
     pub category: String,
     pub observed_request_ids: Vec<String>,

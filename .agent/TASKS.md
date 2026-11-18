@@ -30,8 +30,8 @@ Priorities: `P0` (Critical) | `P1` (Core) | `P2` (Important) | `P3` (Enhancement
 | `P1-02` | P1 | Comprehensive secret & PII detection/redaction rules (`harflow-security`) | `P0-10` | DONE | Detects headers, cookies, JWT-like tokens, form fields, query params; zero raw secrets in logs/storage |
 | `P1-03` | P1 | Full Traffic Normalizer (`harflow-normalizer`) | `P1-01`, `P1-02` | DONE | Preserves duplicate headers/query order, GET bodies, absent vs empty vs null, base64/content encodings |
 | `P1-04` | P1 | SQLite local project index + migrations + portable JSON export (`harflow-project`) | `P1-03` | DONE | SQLite tables (`projects`, `sources`, `requests`, `endpoints`, `schemas`, `dependencies`, `evidence`, `user_overrides`, `analysis_runs`, `validation_runs`, `generated_artifacts`) + migration backups |
-| `P1-05` | P1 | CLI `import` & `analyze` production pipeline + `--strict`/`--offline` enforcement | `P1-04` | IN_PROGRESS | Multi-HAR import, statistics calculation, strict exit codes |
-| `P1-06` | P1 | Phase 1 property, fuzz-seed & 1k/10k HAR benchmark tests | `P1-05` | TODO | Property tests for normalizer invariants + initial benchmark telemetry |
+| `P1-05` | P1 | CLI `import` & `analyze` production pipeline + `--strict`/`--offline` enforcement | `P1-04` | DONE | Multi-HAR import, statistics calculation, strict exit codes |
+| `P1-06` | P1 | Phase 1 property, fuzz-seed & 1k/10k HAR benchmark tests | `P1-05` | IN_PROGRESS | Property tests for normalizer invariants + initial benchmark telemetry |
 
 ---
 

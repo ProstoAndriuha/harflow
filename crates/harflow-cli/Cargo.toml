@@ -13,11 +13,14 @@ clap = { workspace = true }
 harflow-core = { path = "../harflow-core" }
 harflow-generator = { path = "../harflow-generator" }
 harflow-graph = { path = "../harflow-graph" }
+harflow-har = { path = "../harflow-har" }
 harflow-openapi = { path = "../harflow-openapi" }
 harflow-project = { path = "../harflow-project" }
 harflow-replay = { path = "../harflow-replay" }
 harflow-report = { path = "../harflow-report" }
+serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+flate2 = { workspace = true }
 uuid = { workspace = true }

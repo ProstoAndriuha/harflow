@@ -1,7 +1,10 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use uuid::Uuid;
 
 fn repo_root() -> PathBuf {
@@ -55,6 +58,7 @@ fn full_import_analyze_endpoints_graph_export_report_pipeline() {
     );
     assert!(project_dir.join("project.json").exists());
     assert!(project_dir.join("api-model.json").exists());
+    assert!(project_dir.join("harflow.sqlite").exists());
 
     for args in [
         vec!["analyze", project_dir.to_str().unwrap()],
@@ -112,4 +116,101 @@ fn malformed_har_exits_3_and_unknown_flag_exits_2() {
     assert_eq!(bad_flag.status.code(), Some(2));
 
     let _ = fs::remove_dir_all(&project_dir);
+}
+
+#[test]
+fn multi_har_and_gzip_import_strict_and_config_validation() {
+    let base = std::env::temp_dir().join(format!("harflow_cli_multi_{}", Uuid::new_v4()));
+    let project_dir = base.join("proj-multi");
+    let session_a = repo_root().join("fixtures/multi-session/session-a.har.json");
+    let session_b = repo_root().join("fixtures/multi-session/session-b.har.json");
+
+    let multi = Command::new(bin_path())
+        .args([
+            "import",
+            session_a.to_str().unwrap(),
+            session_b.to_str().unwrap(),
+            "--project",
+            project_dir.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run multi import");
+    assert!(
+        multi.status.success(),
+        "multi stderr: {}",
+        String::from_utf8_lossy(&multi.stderr)
+    );
+    let multi_json: serde_json::Value =
+        serde_json::from_slice(&multi.stdout).expect("parse multi json");
+    assert_eq!(multi_json["importedCount"], 2);
+
+    let analyze = Command::new(bin_path())
+        .args(["analyze", project_dir.to_str().unwrap(), "--json"])
+        .output()
+        .expect("run analyze");
+    assert!(analyze.status.success());
+    let stats: serde_json::Value = serde_json::from_slice(&analyze.stdout).expect("parse stats");
+    assert_eq!(stats["totalRequests"], 2);
+
+    // Gzipped HAR import test
+    fs::create_dir_all(&base).expect("mkdir base");
+    let gz_path = base.join("sample.har.gz");
+    let raw_bytes = fs::read(&session_a).expect("read session_a");
+    let mut enc = GzEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(&raw_bytes).expect("write gz");
+    fs::write(&gz_path, enc.finish().expect("finish gz")).expect("write gz file");
+
+    let gz_proj = base.join("proj-gz");
+    let gz_out = Command::new(bin_path())
+        .args([
+            "import",
+            gz_path.to_str().unwrap(),
+            "--project",
+            gz_proj.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run gz import");
+    assert!(
+        gz_out.status.success(),
+        "gz stderr: {}",
+        String::from_utf8_lossy(&gz_out.stderr)
+    );
+
+    // Strict mode failure on partial entry
+    let partial_har = base.join("partial.har.json");
+    fs::write(
+        &partial_har,
+        r#"{"log":{"version":"1.2","entries":[{"request":{"method":"","url":""}},{"request":{"method":"GET","url":"https://api.example.test/ok"}}]}}"#,
+    )
+    .expect("write partial har");
+    let strict_proj = base.join("proj-strict");
+    let strict_out = Command::new(bin_path())
+        .args([
+            "import",
+            partial_har.to_str().unwrap(),
+            "--project",
+            strict_proj.to_str().unwrap(),
+            "--strict",
+        ])
+        .output()
+        .expect("run strict import");
+    assert_eq!(strict_out.status.code(), Some(3));
+
+    // Missing --config exits with code 2 (InvalidArgs)
+    let bad_cfg_out = Command::new(bin_path())
+        .args([
+            "import",
+            session_a.to_str().unwrap(),
+            "--project",
+            base.join("proj-badcfg").to_str().unwrap(),
+            "--config",
+            base.join("missing-config.json").to_str().unwrap(),
+        ])
+        .output()
+        .expect("run bad config");
+    assert_eq!(bad_cfg_out.status.code(), Some(2));
+
+    let _ = fs::remove_dir_all(&base);
 }

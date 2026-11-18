@@ -49,9 +49,14 @@ async function decodeHarBytes(
     throw new Error('Gzip decompression is not supported in this browser environment');
   }
 
-  const stream = new Blob([bytes as BlobPart])
-    .stream()
-    .pipeThrough(new DecompressionStream('gzip'));
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }).pipeThrough(
+    new DecompressionStream('gzip') as ReadableWritablePair<Uint8Array, Uint8Array>,
+  );
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;

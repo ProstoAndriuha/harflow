@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Phase 4 (Professional UI):
+  - Client-side Phase 2/3 analytical parity in `InMemoryApplicationAdapter` (`harImport`, `intelligenceEngine`, `graphBuilder`), bounded Undo/Redo history stack (`historyStack.ts`), and expanded typed `shared-types` preserving the 16-command Tauri desktop contract.
+  - Windowed `VirtualTable` (`@harflow/ui`) handling 10k+ entries smoothly, paired with `TrafficExplorerPage`, `SmartCleanerBar` (13-category toggles, custom rules, preview diff, soft exclude/restore), and 8-tab `RequestInspector` (`Overview`, `Headers`, `Query`, `Cookies`, `Body`, `Response`, `Timing`, `Security`).
+  - Interactive `DependencyGraphCanvas` (`@harflow/ui`) and 3-pane `DependencyGraphPage` supporting all 5 SRS M10 perspectives, zoom/pan/fit/reset, path highlighting, cycle indicators, non-color status badges, evidence/mapping editing with Undo/Redo, and SVG/JSON export.
+  - `EndpointsSchemasPage` with recursive `SchemaTreeView` (`required`/`optional`, `nullable`, `union`, `enum`, TypeScript/Pydantic previews) & template overrides, plus `SessionsComparisonPage` (M08 token rotations & expiration signals, M09 parameter variability & schema drift).
+  - Global `CommandPalette` (`Ctrl+K`), keyboard shortcuts (`Ctrl+Z`/`Ctrl+Y`/`Alt+1..6`), multi-file `.har`/`.har.gz` `HarDropzone` with local decompression-bomb limits, complete EN/RU localization, skip-to-content link, and Dark/Light accessibility polish.
 - Phase 3 (Dependency Engine & Session Intelligence):
   - Credential-payload redacted fingerprint correlation (`parse_redacted_marker`, `fingerprint_secret` in `harflow-security`) matching JSON token fields (`access_token`) with `Authorization: Bearer ...` headers without persisting raw secrets.
   - Linear-time $O(N)$ Dependency Detection Engine (`harflow-dependencies`) with chronological per-session timelines, 8-location producer/consumer extraction, `Identity`/`PrefixSuffix`/`UrlEncoding`/`Base64`/`JsonExtract` matching, pre-existing client & weak-scalar exclusion filters, and calibrated $C = 0.30V + 0.20T + 0.20U + 0.20R + 0.10S$ confidence scoring.

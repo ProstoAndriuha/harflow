@@ -69,13 +69,25 @@ Priorities: `P0` (Critical) | `P1` (Core) | `P2` (Important) | `P3` (Enhancement
 | `P4-03` | P1 | Interactive Dependency Graph Studio (`apps/web`, `packages/ui`) | `P4-01` | DONE | Supports 5 graph perspectives, zoom/pan/fit/search, node/edge filtering, evidence inspector, manual confirm/reject/edit with Undo/Redo & SVG/JSON export + non-color status badges |
 | `P4-04` | P1 | Endpoints, Schemas & Multi-HAR Session Comparison views (`apps/web`) | `P4-01` | DONE | Displays clustered endpoints, recursive schema fields (`required`/`nullable`/`union`/`enum`), session lifecycle rotations & Multi-HAR parameter variability / schema drift reports |
 | `P4-05` | P2 | Command Palette (`Ctrl+K`), keyboard shortcuts, drag-and-drop multi-HAR import, full EN/RU localization & Light/Dark accessibility polish (`apps/web`, `packages/ui`) | `P4-02`, `P4-03`, `P4-04` | DONE | Complete EN/RU i18n coverage, keyboard navigation & accessible contrast across Dark/Light themes, multi-file `.har`/`.har.gz` dropzone |
-| `P4-06` | P1 | Phase 4 Vitest/Testing-Library component & accessibility suite, bundle build check & Checkpoint `CP-005` | `P4-05` | IN_PROGRESS | Component/a11y/undo-redo tests, lint, typecheck, Vite build & `CP-005` synced to `origin/main` |
+| `P4-06` | P1 | Phase 4 Vitest/Testing-Library component & accessibility suite, bundle build check & Checkpoint `CP-005` | `P4-05` | DONE | Component/a11y/undo-redo tests, lint, typecheck, Vite build & `CP-005` synced to `origin/main` |
 
 ---
 
-## Future Epics (Phases 5–8)
+## Active Epic: Phase 5 — SDK & OpenAPI Generators (Ready)
 
-- `P5-01`: Phase 5 — Python `httpx` + TypeScript `fetch` SDK generators, OpenAPI 3.1 generator, Export ZIP (`harflow-generator`, `harflow-openapi`)
+| ID | Priority | Task | Depends On | Status | Acceptance Criteria |
+| -- | -------- | ---- | ---------- | ------ | ------------------- |
+| `P5-01` | P1 | OpenAPI 3.1 generator (`paths`, `parameters`, `requestBody`, `responses`, `$ref` schemas, `securitySchemes`, diagnostics) (`crates/harflow-openapi`) | `P4-06` | TODO | Emits validated OpenAPI 3.1 JSON/YAML with deterministic operation IDs, `$ref` components & explicit missing-info warnings |
+| `P5-02` | P1 | Python async `httpx` + Pydantic v2 SDK generator (`crates/harflow-generator`) | `P5-01` | TODO | Generates `client.py`, `models.py`, `auth.py`, `pagination.py`, `errors.py`, `pyproject.toml`, tests & `README.md` with zero embedded secrets |
+| `P5-03` | P1 | TypeScript `fetch` async SDK generator (`crates/harflow-generator`) | `P5-01` | TODO | Generates `client.ts`, `models.ts`, `auth.ts`, `errors.ts`, `AbortSignal` support, `package.json`, `tsconfig.json`, tests & `README.md` |
+| `P5-04` | P1 | Export Manager ZIP & bundle exporter with mandatory final secret-leakage gate (`crates/harflow-report`, `crates/harflow-project`, `crates/harflow-cli`) | `P5-02`, `P5-03` | TODO | Exports SDK ZIP, OpenAPI JSON/YAML, Graph SVG/JSON, Markdown/HTML report & Project Bundle after running final secret scan |
+| `P5-05` | P2 | Web SDK Studio & Export preview wiring (`apps/web`, `packages/shared-types`) | `P5-04` | TODO | Connects `sdk.preview` / `sdk.generate` / `export.create` UI studio panel with generated file tree preview & download |
+| `P5-06` | P1 | Generated Python (`ruff`/`mypy`/`pytest`) & TypeScript (`tsc`/`vitest`) verification suite, `< 2s` 100-endpoint generation benchmark & Checkpoint `CP-006` | `P5-05` | TODO | Generated SDKs pass target-language checks, 100-endpoint generation meets `< 2s` budget & `CP-006` synced to `origin/main` |
+
+---
+
+## Future Epics (Phases 6–8)
+
 - `P6-01`: Phase 6 — Mock Replay server, Validation Center, Golden SDK tests (`harflow-replay`)
 - `P7-01`: Phase 7 — Native Tauri 2 desktop bundling, installers, security hardening (`apps/desktop`)
 - `P8-01`: Phase 8 — Optional sanitized-context AI assistant & extended generators (`harflow-ai`)

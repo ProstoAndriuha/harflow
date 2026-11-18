@@ -7,4 +7,5 @@ license.workspace = true
 [dependencies]
 harflow-core = { path = "../harflow-core" }
 harflow-model = { path = "../harflow-model" }
+harflow-normalizer = { path = "../harflow-normalizer" }
 serde = { workspace = true }

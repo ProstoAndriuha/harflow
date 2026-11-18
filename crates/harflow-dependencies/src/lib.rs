@@ -1,6 +1,8 @@
+pub mod detector;
 pub mod extractor;
 pub mod timeline;
 
+pub use detector::detect_dependencies;
 pub use extractor::{
     extract_candidates, extract_timeline_candidates, CandidateValue, EntryCandidates,
     ScalarTypeHint,

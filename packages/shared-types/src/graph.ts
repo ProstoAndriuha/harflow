@@ -1,4 +1,4 @@
-import type { ConfirmationStatus, Diagnostic } from './api-model.js';
+import type { ConfirmationStatus, DependencyType, Diagnostic } from './api-model.js';
 
 export type GraphKind =
   | 'request_dependency'
@@ -22,6 +22,8 @@ export interface GraphEdge {
   status: ConfirmationStatus;
   confidence: number;
   label: string;
+  dependencyType?: DependencyType | null;
+  isPaginationLoop?: boolean | null;
 }
 
 export interface GraphViewModel {
